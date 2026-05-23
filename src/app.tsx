@@ -24,7 +24,10 @@ function RootRedirect() {
   const isSignedIn = useAuthStore((s) => s.isSignedIn);
 
   useEffect(() => {
-    bridge.hasAccount().then(setHasAccount).catch(() => setHasAccount(false));
+    bridge
+      .hasAccount()
+      .then(setHasAccount)
+      .catch(() => setHasAccount(false));
   }, []);
 
   if (hasAccount === null) return null;
@@ -55,10 +58,7 @@ export default function App() {
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route
-          path="/register/provisioning"
-          element={<RegisterProvisioningPage />}
-        />
+        <Route path="/register/provisioning" element={<RegisterProvisioningPage />} />
         <Route
           element={
             <RequireAuth>
