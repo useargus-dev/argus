@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-import { cn } from "../../lib/cn";
-import { Input } from "./input";
+import { ArgusInput } from "./argus-input";
+import { Field } from "./field";
 
 interface PasswordInputProps {
   label?: string;
@@ -22,29 +22,29 @@ export function PasswordInput({
   placeholder,
 }: PasswordInputProps) {
   const [show, setShow] = useState(false);
+
   return (
-    <div className="relative">
-      <Input
-        label={label}
-        type={show ? "text" : "password"}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        error={error}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        className="pr-10"
-      />
-      <button
-        type="button"
-        className={cn(
-          "absolute right-2 top-8 text-text-muted hover:text-text",
-        )}
-        onClick={() => setShow((s) => !s)}
-        tabIndex={-1}
-        aria-label={show ? "Hide password" : "Show password"}
-      >
-        {show ? <EyeOff size={16} /> : <Eye size={16} />}
-      </button>
-    </div>
+    <Field label={label} error={error}>
+      <div className="relative">
+        <ArgusInput
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          spellCheck={false}
+          className="argus-password-input pr-10"
+        />
+        <button
+          type="button"
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-text-muted transition-colors hover:text-text"
+          onClick={() => setShow((s) => !s)}
+          tabIndex={-1}
+          aria-label={show ? "Hide password" : "Show password"}
+        >
+          {show ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+        </button>
+      </div>
+    </Field>
   );
 }

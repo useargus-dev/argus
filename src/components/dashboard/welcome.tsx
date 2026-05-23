@@ -8,7 +8,7 @@ export function DashboardWelcome() {
   return (
     <Stack>
       <div className="flex items-center gap-3">
-        <LayoutDashboard className="text-accent" size={28} />
+        <LayoutDashboard className="text-primary" size={28} />
         <h1 className="text-2xl font-semibold text-text">Dashboard</h1>
       </div>
       <Text tone="muted" className="max-w-lg">

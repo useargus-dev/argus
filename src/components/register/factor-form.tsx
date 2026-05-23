@@ -1,21 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FingerprintPattern, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  biometryAvailable,
-  BiometricButton,
-  isBiometricPlatform,
-} from "../auth/biometric-button";
-import { TotpSetupPanel } from "../auth/totp-setup";
+import { isBiometricPlatform, biometryAvailable } from "../auth/biometric-button";
 import { Button } from "../ui/button";
-import { Form, FormActions } from "../ui/form";
-import { Row } from "../ui/row";
-import { Stack } from "../ui/stack";
 import { Text } from "../ui/text";
 import { BridgeError, bridge } from "../../lib/tauri-bridge";
 import { useRegisterStore } from "../../state/register-store";
-import { FactorOption } from "./factor-option";
+import { FactorCard } from "./factor-card";
+import { RegisterBiometricPanel } from "./biometric-panel";
+import { RegisterTotpPanel } from "./totp-panel";
 
 export function RegisterFactorForm() {
   const navigate = useNavigate();
@@ -24,7 +19,6 @@ export function RegisterFactorForm() {
     username,
     password,
     secondFactorType,
-    totpSetup,
     totpCode,
     biometricReady,
     setStep,
@@ -39,10 +33,17 @@ export function RegisterFactorForm() {
     biometryAvailable().then(setBioAvailable);
   }, []);
 
+  useEffect(() => {
+    if (!bioAvailable && secondFactorType === "biometric") {
+      setSecondFactorType("totp");
+    }
+  }, [bioAvailable, secondFactorType, setSecondFactorType]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
+      const totpSetup = useRegisterStore.getState().totpSetup;
       await bridge.registerValidate({
         email: email.trim(),
         username: username.trim(),
@@ -62,49 +63,60 @@ export function RegisterFactorForm() {
   }
 
   const accountLabel = email.trim() || username.trim() || "argus@local";
+  const showBio = isBiometricPlatform() && bioAvailable;
+
+  const canContinue =
+    secondFactorType === "totp"
+      ? totpCode.length === 6
+      : biometricReady;
 
   return (
-    <Form onSubmit={handleSubmit}>
-      <Stack className="space-y-2">
-        <span className="text-sm font-medium text-text">Second factor (required)</span>
-        <Row>
-          <FactorOption
-            active={secondFactorType === "totp"}
-            onClick={() => setSecondFactorType("totp")}
-            label="Authenticator app"
-          />
-          {isBiometricPlatform() && bioAvailable && (
-            <FactorOption
-              active={secondFactorType === "biometric"}
-              onClick={() => setSecondFactorType("biometric")}
-              label="Biometric"
-            />
-          )}
-        </Row>
-        {!isBiometricPlatform() && (
-          <Text tone="muted" className="text-xs">
-            Linux: biometric unlock is not available — use TOTP.
-          </Text>
-        )}
-      </Stack>
-
-      {secondFactorType === "totp" ? (
-        <TotpSetupPanel accountLabel={accountLabel} />
-      ) : (
-        <BiometricButton
-          onSuccess={() => setBiometricReady(true)}
-          label={
-            biometricReady
-              ? "Biometric enrolled ✓"
-              : "Enroll fingerprint / Windows Hello"
-          }
+    <form onSubmit={handleSubmit}>
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <FactorCard
+          active={secondFactorType === "totp"}
+          onClick={() => setSecondFactorType("totp")}
+          icon={<QrCode className="size-5" aria-hidden />}
+          title="Authenticator"
+          description="TOTP via app"
         />
+        {showBio ? (
+          <FactorCard
+            active={secondFactorType === "biometric"}
+            onClick={() => setSecondFactorType("biometric")}
+            icon={<FingerprintPattern className="size-5" aria-hidden />}
+            title="Biometric"
+            description="Touch ID / Hello"
+          />
+        ) : (
+          <div className="rounded-lg border border-border bg-surface p-4 opacity-50">
+            <FingerprintPattern className="mb-2 size-5 text-text-muted" aria-hidden />
+            <div className="text-sm font-medium text-text-muted">Biometric</div>
+            <div className="text-xs text-text-muted">Unavailable</div>
+          </div>
+        )}
+      </div>
+
+      {!showBio && isBiometricPlatform() === false && (
+        <Text tone="muted" className="mb-4 text-xs">
+          Linux: biometric unlock is not available — use TOTP.
+        </Text>
       )}
 
-      <FormActions>
+      {secondFactorType === "totp" ? (
+        <RegisterTotpPanel accountLabel={accountLabel} />
+      ) : showBio ? (
+        <RegisterBiometricPanel
+          enrolled={biometricReady}
+          onEnrolled={() => setBiometricReady(true)}
+        />
+      ) : null}
+
+      <div className="flex gap-2">
         <Button
           type="button"
           variant="ghost"
+          className="h-10 flex-1"
           onClick={() => setStep(1)}
           disabled={loading}
         >
@@ -112,16 +124,13 @@ export function RegisterFactorForm() {
         </Button>
         <Button
           type="submit"
-          className="flex-1"
-          disabled={
-            loading ||
-            (secondFactorType === "totp" && totpCode.length !== 6) ||
-            (secondFactorType === "biometric" && !biometricReady)
-          }
+          variant="primary"
+          className="h-10 flex-1"
+          disabled={loading || !canContinue}
         >
-          {loading ? "Validating…" : "Create account"}
+          {loading ? "Validating…" : "Continue"}
         </Button>
-      </FormActions>
-    </Form>
+      </div>
+    </form>
   );
 }

@@ -1,6 +1,6 @@
+import { ArgusInput } from "../ui/argus-input";
 import { Button } from "../ui/button";
-import { Form, FormActions } from "../ui/form";
-import { Input } from "../ui/input";
+import { Field } from "../ui/field";
 
 interface TotpFormProps {
   totpCode: string;
@@ -18,28 +18,39 @@ export function LoginTotpForm({
   onSubmit,
 }: TotpFormProps) {
   return (
-    <Form onSubmit={onSubmit}>
-      <Input
-        label="6-digit code"
-        inputMode="numeric"
-        maxLength={6}
-        placeholder="000000"
-        value={totpCode}
-        onChange={(e) => onTotpChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
-        autoFocus
-      />
-      <FormActions>
-        <Button type="button" variant="ghost" onClick={onBack} disabled={loading}>
+    <form onSubmit={onSubmit}>
+      <Field label="6-digit code">
+        <ArgusInput
+          inputMode="numeric"
+          maxLength={6}
+          placeholder="000000"
+          value={totpCode}
+          onChange={(e) =>
+            onTotpChange(e.target.value.replace(/\D/g, "").slice(0, 6))
+          }
+          autoFocus
+          className="text-center font-mono tracking-[0.3em]"
+        />
+      </Field>
+      <div className="mt-5 flex gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-10 flex-1"
+          onClick={onBack}
+          disabled={loading}
+        >
           Back
         </Button>
         <Button
           type="submit"
-          className="flex-1"
+          variant="primary"
+          className="h-10 flex-1"
           disabled={loading || totpCode.length !== 6}
         >
           {loading ? "Signing in…" : "Sign in"}
         </Button>
-      </FormActions>
-    </Form>
+      </div>
+    </form>
   );
 }

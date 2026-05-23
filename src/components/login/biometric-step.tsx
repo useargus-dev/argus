@@ -1,6 +1,7 @@
+import { FingerprintPattern } from "lucide-react";
+
 import { BiometricButton } from "../auth/biometric-button";
 import { Button } from "../ui/button";
-import { Stack } from "../ui/stack";
 
 interface BiometricStepProps {
   loading: boolean;
@@ -14,17 +15,23 @@ export function LoginBiometricStep({
   onBack,
 }: BiometricStepProps) {
   return (
-    <Stack>
-      <BiometricButton onSuccess={onSuccess} />
+    <div>
+      <div className="mb-4 rounded-md border border-border bg-surface-muted p-4 text-center">
+        <FingerprintPattern className="mx-auto size-10 text-primary" aria-hidden />
+        <p className="mt-2 text-xs text-text-muted">Verify with your biometric</p>
+        <div className="mt-3">
+          <BiometricButton onSuccess={onSuccess} />
+        </div>
+      </div>
       <Button
         type="button"
         variant="ghost"
-        className="w-full"
+        className="h-10 w-full"
         onClick={onBack}
         disabled={loading}
       >
         Back
       </Button>
-    </Stack>
+    </div>
   );
 }

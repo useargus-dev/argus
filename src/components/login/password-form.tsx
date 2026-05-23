@@ -1,6 +1,6 @@
+import { ArgusInput } from "../ui/argus-input";
 import { Button } from "../ui/button";
-import { Form } from "../ui/form";
-import { Input } from "../ui/input";
+import { Field } from "../ui/field";
 import { PasswordInput } from "../ui/password-input";
 
 interface PasswordFormProps {
@@ -21,22 +21,25 @@ export function LoginPasswordForm({
   onSubmit,
 }: PasswordFormProps) {
   return (
-    <Form onSubmit={onSubmit}>
-      <Input
-        label="Email or username"
-        autoComplete="username"
-        value={identifier}
-        onChange={(e) => onIdentifierChange(e.target.value)}
-        required
-      />
-      <PasswordInput
-        value={password}
-        onChange={onPasswordChange}
-        autoComplete="current-password"
-      />
-      <Button type="submit" className="w-full" disabled={loading}>
+    <form onSubmit={onSubmit}>
+      <div className="space-y-3">
+        <Field label="Email or username">
+          <ArgusInput
+            autoComplete="username"
+            value={identifier}
+            onChange={(e) => onIdentifierChange(e.target.value)}
+            required
+          />
+        </Field>
+        <PasswordInput
+          value={password}
+          onChange={onPasswordChange}
+          autoComplete="current-password"
+        />
+      </div>
+      <Button type="submit" variant="primary" className="mt-5 h-10 w-full" disabled={loading}>
         {loading ? "Verifying…" : "Continue"}
       </Button>
-    </Form>
+    </form>
   );
 }

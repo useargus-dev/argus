@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ArgusInput } from "../ui/argus-input";
 import { Button } from "../ui/button";
-import { Form } from "../ui/form";
-import { Input } from "../ui/input";
+import { Field } from "../ui/field";
 import { PasswordInput } from "../ui/password-input";
 import { useRegisterStore } from "../../state/register-store";
 
@@ -29,36 +29,44 @@ export function RegisterAccountForm() {
   }
 
   return (
-    <Form onSubmit={handleSubmit}>
-      <Input
-        label="Email"
-        type="email"
-        autoComplete="email"
-        value={email}
-        onChange={(e) => useRegisterStore.setState({ email: e.target.value })}
-        required
-      />
-      <Input
-        label="Username"
-        autoComplete="username"
-        value={username}
-        onChange={(e) => useRegisterStore.setState({ username: e.target.value })}
-        required
-      />
-      <PasswordInput
-        value={password}
-        onChange={setPassword}
-        autoComplete="new-password"
-      />
-      <PasswordInput
-        label="Confirm password"
-        value={confirm}
-        onChange={setConfirm}
-        autoComplete="new-password"
-      />
-      <Button type="submit" className="w-full">
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-3">
+        <Field label="Email">
+          <ArgusInput
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) =>
+              useRegisterStore.setState({ email: e.target.value })
+            }
+            required
+          />
+        </Field>
+        <Field label="Username">
+          <ArgusInput
+            autoComplete="username"
+            value={username}
+            onChange={(e) =>
+              useRegisterStore.setState({ username: e.target.value })
+            }
+            required
+          />
+        </Field>
+        <PasswordInput
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+        />
+        <PasswordInput
+          label="Confirm password"
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+        />
+      </div>
+      <Button type="submit" variant="primary" className="mt-5 h-10 w-full">
         Continue
       </Button>
-    </Form>
+    </form>
   );
 }

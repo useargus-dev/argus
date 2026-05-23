@@ -1,18 +1,74 @@
 @import "tailwindcss";
 
+/* Semantic tokens — overridden per theme on :root / .dark */
+:root {
+  --argus-bg: #f1f5f9;
+  --argus-surface: #ffffff;
+  --argus-surface-raised: #eef2f7;
+  --argus-surface-muted: #eff6ff;
+  --argus-border: #e2e8f0;
+  --argus-text: #0f172a;
+  --argus-text-muted: #64748b;
+  --argus-primary: #1e293b;
+  --argus-primary-hover: #334155;
+  --argus-primary-fg: #ffffff;
+  --argus-focus-ring: color-mix(in oklab, var(--argus-primary) 22%, transparent);
+  --argus-success: #16a34a;
+  --argus-success-fg: #ffffff;
+  --argus-success-muted: #dcfce7;
+  --argus-success-border: #bbf7d0;
+  --argus-warning: #d97706;
+  --argus-danger: #dc2626;
+  --argus-brand-bg: #f1f5f9;
+  --argus-brand-border: #e2e8f0;
+  --argus-brand-icon: #1e293b;
+  --argus-card-shadow: 0 1px 3px rgb(15 23 42 / 0.06), 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.dark {
+  --argus-bg: #0c0e12;
+  --argus-surface: #141820;
+  --argus-surface-raised: #1c2230;
+  --argus-surface-muted: #1a2433;
+  --argus-border: #2a3344;
+  --argus-text: #e8edf4;
+  --argus-text-muted: #8b95a8;
+  --argus-primary: #3b9eff;
+  --argus-primary-hover: #5aafff;
+  --argus-primary-fg: #0a1628;
+  --argus-focus-ring: color-mix(in oklab, var(--argus-primary) 28%, transparent);
+  --argus-success: #34d399;
+  --argus-success-fg: #0c0e12;
+  --argus-success-muted: rgb(52 211 153 / 0.12);
+  --argus-success-border: rgb(52 211 153 / 0.35);
+  --argus-warning: #fbbf24;
+  --argus-danger: #f87171;
+  --argus-brand-bg: rgb(59 158 255 / 0.12);
+  --argus-brand-border: rgb(59 158 255 / 0.28);
+  --argus-brand-icon: #3b9eff;
+  --argus-card-shadow: none;
+}
+
 @theme {
-  --color-bg: #0c0e12;
-  --color-surface: #141820;
-  --color-surface-raised: #1c2230;
-  --color-border: #2a3344;
-  --color-text: #e8edf4;
-  --color-text-muted: #8b95a8;
-  --color-accent: #3b9eff;
-  --color-accent-hover: #5aafff;
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-danger: #f87171;
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --color-bg: var(--argus-bg);
+  --color-surface: var(--argus-surface);
+  --color-surface-raised: var(--argus-surface-raised);
+  --color-surface-muted: var(--argus-surface-muted);
+  --color-border: var(--argus-border);
+  --color-text: var(--argus-text);
+  --color-text-muted: var(--argus-text-muted);
+  --color-primary: var(--argus-primary);
+  --color-primary-hover: var(--argus-primary-hover);
+  --color-primary-foreground: var(--argus-primary-fg);
+  --color-accent: var(--argus-primary);
+  --color-accent-hover: var(--argus-primary-hover);
+  --color-accent-foreground: var(--argus-primary-fg);
+  --color-success: var(--argus-success);
+  --color-success-muted: var(--argus-success-muted);
+  --color-success-border: var(--argus-success-border);
+  --color-warning: var(--argus-warning);
+  --color-danger: var(--argus-danger);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, monospace;
 }
 
@@ -20,8 +76,54 @@
   body {
     margin: 0;
     min-height: 100dvh;
-    background-color: var(--color-bg);
-    color: var(--color-text);
+    background-color: var(--argus-bg);
+    color: var(--argus-text);
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .argus-input {
+    width: 100%;
+    background: var(--argus-surface-raised);
+    border: 1px solid var(--argus-border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--argus-text);
+    outline: none;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+
+  .argus-input::placeholder {
+    color: var(--argus-text-muted);
+  }
+
+  .argus-input:focus {
+    border-color: var(--argus-primary);
+    box-shadow: 0 0 0 3px var(--argus-focus-ring);
+  }
+
+  .argus-card {
+    border-radius: 0.75rem;
+    border: 1px solid var(--argus-border);
+    background: var(--argus-surface);
+    box-shadow: var(--argus-card-shadow);
+  }
+
+  /* Custom reveal only — hide Edge/WebView2 and Chromium native password UI */
+  .argus-password-input::-ms-reveal,
+  .argus-password-input::-ms-clear {
+    display: none !important;
+  }
+
+  .argus-password-input::-webkit-credentials-auto-fill-button,
+  .argus-password-input::-webkit-password-reveal-button {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none !important;
   }
 }

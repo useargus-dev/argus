@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { AppShell } from "./components/layout/app-shell";
+import { ThemeToggle } from "./components/layout/theme-toggle";
 import { useTauriEvent } from "./hooks/use-tauri-event";
 import { bridge } from "./lib/tauri-bridge";
 import { DashboardPage } from "./pages/dashboard";
@@ -11,11 +12,28 @@ import { RegisterPage } from "./pages/register";
 import { RegisterProvisioningPage } from "./pages/register-provisioning";
 import { SettingsPage } from "./pages/settings";
 import { useAuthStore } from "./state/auth-store";
+import { getStoredTheme } from "./lib/theme";
+import { useThemeStore } from "./state/theme-store";
 import type { ScopeStatus, UserProfile } from "./types/auth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isSignedIn = useAuthStore((s) => s.isSignedIn);
   if (!isSignedIn) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function RequireNoAccount({ children }: { children: React.ReactNode }) {
+  const [hasAccount, setHasAccount] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    bridge
+      .hasAccount()
+      .then(setHasAccount)
+      .catch(() => setHasAccount(false));
+  }, []);
+
+  if (hasAccount === null) return null;
+  if (hasAccount) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
@@ -40,6 +58,11 @@ export default function App() {
   const setSignedIn = useAuthStore((s) => s.setSignedIn);
   const clear = useAuthStore((s) => s.clear);
   const setScopes = useAuthStore((s) => s.setScopes);
+  const theme = useThemeStore((s) => s.theme);
+
+  useEffect(() => {
+    useThemeStore.setState({ theme: getStoredTheme() });
+  }, []);
 
   useTauriEvent<UserProfile>("signed-in", (p) => {
     bridge.getScopeStatus().then((scopes) => setSignedIn(p, scopes));
@@ -53,12 +76,27 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Toaster theme="dark" position="top-right" />
+      <Toaster theme={theme} position="top-right" />
+      <ThemeToggle />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register/provisioning" element={<RegisterProvisioningPage />} />
+        <Route
+          path="/register"
+          element={
+            <RequireNoAccount>
+              <RegisterPage />
+            </RequireNoAccount>
+          }
+        />
+        <Route
+          path="/register/provisioning"
+          element={
+            <RequireNoAccount>
+              <RegisterProvisioningPage />
+            </RequireNoAccount>
+          }
+        />
         <Route
           element={
             <RequireAuth>
