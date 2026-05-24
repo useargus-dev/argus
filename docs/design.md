@@ -4,6 +4,8 @@
 > **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Zustand · Lucide React · React Hook Form · **boneyard-js** (skeletons)  
 > **Layout:** Bento grid dashboard · custom UI component library (no generic component kit)
 
+> **Note:** Screens marked **(planned)** or shown only in wireframes are not implemented yet (e.g. client access popup, rich tray menu). See [README](../README.md) for the current UI.
+
 **Related:** [architecture.md](./architecture.md) · [plan.md](./plan.md) · [security.md](./security.md)
 
 ---
@@ -337,7 +339,7 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 │  Access TTL (this bucket)  [1 hour ▾]   ← overrides global default │
   Refresh TTL (optional)    [none ▾]                               │
   [✓] Active in system tray                                        │
-  Client token (read-only)   ag_live_••••••••  [Regenerate]         │
+  ARGUS_BUCKET_TOKEN (masked) ••••••••  [Reveal] [Regenerate]      │
 │                                                                  │
 │  ── Mappings ─────────────────────────────────────────────────  │
 │  ENV LABEL              SECRET                                   │
@@ -398,7 +400,7 @@ Full-screen overlay when idle app lock fires. TOTP or biometric only (password n
 
 ---
 
-## 9. Client Access Popup
+## 9. Client Access Popup **(planned)**
 
 When a **new** client (bucket + uri + token) requests secrets:
 
@@ -408,7 +410,7 @@ When a **new** client (bucket + uri + token) requests secrets:
 │                                                              │
 │  Bucket:     Acme Backend                                    │
 │  URI:        file:///Users/dev/projects/acme-backend         │
-│  Token:      ag_live_••••4f2a                                │
+│  Token:      ARGUS_BUCKET_TOKEN (masked)                       │
 │  Process:    python (/usr/bin/python3)                       │
 │                                                              │
 │  Grant access for:  [15m] [1h] [3h] [8h]  (bucket default: 1h)│
@@ -428,9 +430,13 @@ Component: `ClientAccessDialog.tsx`. Event: `client-access-requested`.
 
 ## 10. System Tray
 
+**Shipped:** tray icon, Open, Sign out; window close hides to tray.
+
+**Planned:** pending-request badge, per-bucket submenu.
+
 | Element | Behavior |
 |---|---|
-| Tray icon | Argus eye; badge if pending client requests |
+| Tray icon | Argus icon; **(planned)** badge if pending client requests |
 | Left click | Open main window |
 | Menu: Active buckets | Submenu — one line per `is_tray_active` bucket |
 | Menu: Pending (N) | Opens client access queue |

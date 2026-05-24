@@ -1,7 +1,8 @@
 # Argus — 20-Milestone Development Plan
 
-> Execute milestones **in order**. Each milestone has clear entry criteria, deliverables, and verification steps.  
-> Do not skip ahead — later milestones depend on security boundaries established earlier.
+> **Roadmap only.** This document describes planned work. Features may be missing, partial, or already implemented differently than listed. For the current app, see the [root README](../README.md) and [docs/README.md](./README.md).
+
+Execute milestones **in order** when building toward v1. Later milestones depend on security boundaries established earlier.
 
 **Related:** [architecture.md](./architecture.md) · [design.md](./design.md) · [security.md](./security.md)
 
@@ -16,7 +17,7 @@
 | **Verify** | Commands or manual checks before moving on |
 | **Depends on** | Prior milestone numbers |
 
-**Current scaffold:** Tauri 2 + React 19 + Tailwind v4 + Zustand (`argus/`). Rust backend is minimal — Milestones 1–4 build the security core before UI polish.
+**Current state:** Tauri 2 + React 19 + Tailwind v4 + Zustand. Auth, SQLCipher, vault, buckets, and settings are implemented; IPC, client libraries, and full tray/background service are not. Milestone checkboxes below are **not kept in sync** with `main` — use [README](../README.md) for what ships today.
 
 ---
 
@@ -352,7 +353,7 @@ cargo test -p argus crypto::
 
 ## Milestone 14 — Python client library (future — post design)
 
-**Goal:** `load_secrets()` sending v2 IPC (`ARGUS_BUCKET_ID`, `ARGUS_CLIENT_TOKEN`, `uri`).
+**Goal:** `load_secrets()` sending v2 IPC (`ARGUS_BUCKET_ID`, `ARGUS_BUCKET_TOKEN`, `uri`).
 
 **Depends on:** 13
 
@@ -490,7 +491,7 @@ argus list --bucket "Acme Backend"  # names only
 - [ ] GitHub Actions: build artifacts for win/mac/linux
 - [ ] Code signing pipeline documented (notarization / Authenticode)
 - [ ] Reproducible build notes
-- [ ] License file (e.g. MIT or Apache-2.0 — choose before publish)
+- [x] License file (AGPL-3.0 + [COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md))
 
 **Verify:**
 

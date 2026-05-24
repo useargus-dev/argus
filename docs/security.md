@@ -2,7 +2,8 @@
 
 > This document is the authoritative security specification for Argus.  
 > It defines threats, controls, cryptographic parameters, and release checklists.  
-> A shorter public `SECURITY.md` at the repo root should link here for researchers.
+> Researchers: start with [SECURITY.md](../SECURITY.md) at the repository root.  
+> **IPC / client grants / socket server** sections describe the **target** design; they are **not fully implemented** in v0.1.
 
 **Related:** [architecture.md](./architecture.md) · [plan.md](./plan.md)
 
@@ -260,29 +261,38 @@ At **register**, user must complete **exactly one**:
 | Rule | Detail |
 |---|---|
 | Cannot skip both | Register API returns error if neither completed |
-| Login | Use same method as `second_factor_type` |
-| Elevation | Same method (do not mix TOTP login + biometric elevate unless user enabled both in future) |
+| Login / unlock app | Use same method as `second_factor_type` (TOTP or biometric after soft lock) |
+| Vault / buckets | No separate elevation step — same as app unlock in current builds |
 | Linux | Biometric unavailable → **TOTP required** |
 
-Biometric unlocks a **device-bound** key in OS secure storage — it does **not** replace Argon2id or SQLCipher keys. Password is still required for register, elevation, and recovery flows.
+Biometric unlocks a **device-bound** key in OS secure storage — it does **not** replace Argon2id or SQLCipher keys. Password is required at **register** and **sign-in**; soft lock uses TOTP or biometric only.
 
 ---
 
 ## 8. IPC, Client Tokens & Socket Hardening
 
+*Target design — not implemented in v0.1.*
+
 ### 8.1 Transport
 
-Unix socket `0600` / Windows named pipe with user-only DACL. Socket owned by **tray core**, not only when UI window is open.
+*Planned.*
 
-### 8.2 Client token security
+Unix socket `0600` / Windows named pipe with user-only DACL. Socket will be owned by **tray core**, not only when UI window is open. **Not running in v0.1.**
+
+### 8.2 Bucket client token security
+
+*Partially shipped (desktop UI + DB); IPC validation planned.*
+
+Desktop UI shows `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` in project `.env`. IPC validation is planned.
 
 | Property | Implementation |
 |---|---|
-| Generation | CSPRNG 32+ bytes, prefix `ag_live_` |
-| Storage | Only `SHA-256(token)` in `client_grants.token_hash` |
-| Transmission | Client sends token once per IPC request; never log full token |
-| Rotation | Bucket settings “Regenerate token” invalidates old hashes (requires app unlocked) |
-| Leak | User revokes grant or rotates token; shorten TTL |
+| Generation **(shipped)** | CSPRNG **32** alphanumeric characters (`app_buckets` / `get_bucket_token`) |
+| Storage **(shipped)** | `SHA-256(token)` in `app_buckets.client_token_hash`; encrypted token in `client_token_enc` |
+| IPC grants **(planned)** | `client_grants` table for approved bucket + uri + token |
+| Transmission **(planned)** | Client sends token once per IPC request; never log full token |
+| Rotation **(shipped)** | Toggle bucket active regenerates token; UI copy/reveal in bucket detail |
+| Leak | User rotates token; shorten TTL when IPC ships |
 
 ### 8.3 Request validation (v2)
 
@@ -551,23 +561,7 @@ Before tagging `v0.1.0`:
 
 ## 20. Vulnerability Disclosure
 
-**Template for root `SECURITY.md`:**
-
-```markdown
-# Security Policy
-
-Report vulnerabilities to: security@<your-domain> (or GitHub private advisory)
-
-Please include:
-- Platform (Windows/macOS/Linux)
-- Argus version
-- Steps to reproduce
-- Impact assessment
-
-Do not disclose publicly until fix is released.
-
-We aim to respond within 72 hours.
-```
+Report via **[SECURITY.md](../SECURITY.md)** (GitHub Security Advisories). Do not use public issues for security bugs. Include platform, version, steps to reproduce, and impact.
 
 **In-scope reports:**
 
@@ -585,20 +579,22 @@ We aim to respond within 72 hours.
 
 ## Appendix — Security feature summary
 
-| Feature | Status (v1 target) |
+| Feature | Status (v0.1) |
 |---|---|
-| SQLCipher full-DB encryption | Required |
-| Local account + mandatory 2FA (TOTP or biometric) | Required |
-| Three authorization scopes | Required |
-| Client grants (bucket + uri + token) | Required |
-| System tray + background IPC | Required |
-| Sign out | Required |
-| Per-value AES-GCM | Required |
-| Process approval gate | Required |
-| Append-only audit | Required |
-| Auto-lock + screen lock | Required |
-| Type-based inject blocking | Required |
-| CSP + capabilities | Required |
+| SQLCipher full-DB encryption | Shipped |
+| Local account + mandatory 2FA (TOTP or biometric) | Shipped |
+| App unlock scopes (vault/buckets follow app) | Shipped |
+| Vault + bucket CRUD | Shipped |
+| System tray (open / sign out) | Shipped |
+| Sign out + soft app lock | Shipped |
+| Per-value AES-GCM | Shipped |
+| Auto-lock (idle) | Shipped |
+| CSP + capabilities | Shipped |
+| Client grants + IPC socket | Planned |
+| Process approval gate | Planned |
+| Append-only audit (full) | Partial / planned |
+| Screen lock integration | Planned |
+| Type-based inject blocking (IPC) | Planned |
 | Isolation pattern | Recommended |
 | OS keychain pepper | Future |
 | Hardware security key | Future |

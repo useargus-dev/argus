@@ -26,7 +26,7 @@ export function SecretListPanel({
   secrets,
   selectedId,
   onSelect,
-  detail,
+  detail = null,
   detailLoading = false,
   onEdit,
   onDelete,

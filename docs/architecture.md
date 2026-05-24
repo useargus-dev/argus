@@ -3,6 +3,8 @@
 > **Argus** is a local-first secrets vault and approval gateway for developer environments.  
 > One encrypted database. One OS user. Zero cloud. Secrets leave the machine only when a human approves a specific process identity.
 
+> **Implementation note:** Sections marked **(shipped)** reflect the current desktop app. Sections on **IPC**, **client grants runtime**, and **full tray background service** are **planned** unless stated otherwise. For a short “what works today” list, see [README](../README.md) and [docs/README.md](./README.md).
+
 **Related documents:** [plan.md](./plan.md) · [design.md](./design.md) · [security.md](./security.md)
 
 ---
@@ -188,18 +190,16 @@ User chooses **TOTP or biometric** at setup — **not optional** to skip both.
 ### Sign-out / lock sequence (manual, idle, screen lock, or Settings → Sign out)
 
 ```
-sign_out() or lock() invoked or auto-lock fires
+sign_out() or soft app lock invoked or auto-lock fires
         │
-        ├──► socket server shutdown + unlink socket file
-        ├──► cancel background tasks
-        ├──► zeroize db_key + clear session HashMaps
-        ├──► close DB pool (SQLCipher page cache cleared)
-        └──► emit "signed-out" → frontend clears auth store → `/login`
+        ├──► (planned) socket server shutdown + unlink socket file
+        ├──► (planned) cancel background IPC tasks
+        ├──► sign_out: zeroize keys + clear session; soft lock: app_locked only
+        ├──► sign_out: close DB pool (SQLCipher page cache cleared)
+        └──► emit "signed-out" or "app-locked" → frontend updates auth store
 ```
 
-**Important:** `client_grants` rows **persist** across sign-out of the UI. IPC can still serve approved clients while the tray core is running; full sign-out stops socket + tray.
-
-**Scope 2 / 3 (Vault & bucket CRUD):** After app sign-in, user must **elevate** each scope (password + same second factor) before mutations. Read-only vault list may be allowed with Scope 1 only — configurable global setting `vault_read_requires_elevation`.
+**Scope 2 / 3 (Vault & bucket CRUD) — shipped:** Vault and bucket mutations require **app unlock** only. Separate per-scope elevation was removed; `elevate_vault` / `elevate_buckets` are legacy no-ops when the app is unlocked. Setting `vault_read_requires_elevation` exists in the DB but is not used for a separate elevation step in current builds.
 
 ---
 
@@ -210,13 +210,13 @@ sign_out() or lock() invoked or auto-lock fires
 | File / path | Platform | Permissions | Lifecycle |
 |---|---|---|---|
 | `argus.db` | All | `0600` (user read/write) | Created first run |
-| `argus.sock` | macOS, Linux | `0600` after bind | Created on unlock, removed on lock |
-| `\\.\pipe\argus` | Windows | DACL: current user only | Same lifecycle |
+| `argus.sock` | macOS, Linux | `0600` after bind | **(planned)** Created on unlock, removed on lock |
+| `\\.\pipe\argus` | Windows | DACL: current user only | **(planned)** Same lifecycle |
 | `logs/` (optional) | All | `0700` dir | Debug builds only; no secrets |
 
 Use `dirs` crate → `data_local_dir()` / equivalent, then `~/.argus` (documented, not hardcoded to `$HOME` on Windows).
 
-### 6.2 IPC transport matrix
+### 6.2 IPC transport matrix **(planned — not implemented in v0.1)**
 
 | Platform | Mechanism | Path / name | Security notes |
 |---|---|---|---|
@@ -334,7 +334,7 @@ Managed via `tauri::Manager::manage()` — **single instance** per app process.
 
 | Namespace | Commands |
 |---|---|
-| **auth** | `register`, `sign_in`, `sign_out`, `elevate_vault`, `elevate_buckets`, `get_scope_status`, `get_profile`, `update_profile`, `change_password` |
+| **auth** | `register`, `sign_in`, `sign_out`, `unlock_app`, `lock_app`, `elevate_vault` (legacy), `get_scope_status`, `get_profile`, … |
 | **secrets** | `create_secret`, `update_secret`, `delete_secret`, `get_secret`, `search_secrets`, `archive_secret` |
 | **buckets** | `create_bucket`, `update_bucket`, `delete_bucket`, `get_buckets`, `upsert_mapping`, `remove_mapping` |
 | **approvals** | `get_active_approvals`, `revoke_approval`, `respond_to_approval_request` |
@@ -515,9 +515,9 @@ Full threat analysis: [security.md](./security.md).
 
 ---
 
-## 11. IPC & Socket Server
+## 11. IPC & Socket Server **(planned)**
 
-Socket server runs in **Argus core** (tray process), not only when the main window is open.
+Socket server will run in **Argus core** (tray process), not only when the main window is open. **Not implemented in v0.1.**
 
 ### 11.1 Request (client → Argus) — v2 protocol
 
@@ -527,7 +527,7 @@ Used by future Python/Node libraries (not in current implementation scope). Lega
 {
   "request_id": "uuid-v4",
   "bucket_id": "550e8400-e29b-41d4-a716-446655440000",
-  "client_token": "ag_live_xxxxxxxxxxxxxxxx",
+  "client_token": "<ARGUS_BUCKET_TOKEN value>",
   "uri": "file:///Users/dev/projects/acme-backend",
   "process_name": "python",
   "process_path": "/usr/bin/python3",
@@ -624,35 +624,35 @@ elevate_buckets() → legacy no-op when app unlocked; buckets follow APP
 
 ### 13.1 Process model
 
+**Shipped today:** system tray icon (Open / Sign out), main window **hide** on close (not quit). **Planned:** socket server, client-access popups, and honoring `run_in_background` when deciding close behavior.
+
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Argus Core (Rust) — always when "signed in"              │
-│  • SQLCipher pool                                        │
-│  • Socket server                                         │
-│  • Tray icon + menu                                      │
-│  • Approval / client-access popup controller             │
-│  • Optional: hidden window for WebView popups            │
+│ Argus (Tauri + Rust) — when signed in                    │
+│  • SQLCipher pool (shipped)                              │
+│  • Tray icon + menu (shipped)                            │
+│  • Socket server (planned)                               │
+│  • Approval / client-access popup (planned)              │
 ├─────────────────────────────────────────────────────────┤
-│ Main Window (Tauri + React) — optional, user-closable    │
-│  • Full UI: dashboard, vault, buckets, settings          │
+│ Main Window (React) — user can hide via window close     │
+│  • Dashboard, vault, buckets, settings (shipped)       │
 └─────────────────────────────────────────────────────────┘
 ```
 
-Closing the **main window** minimizes to tray if `run_in_background = 1` (default). **Sign out** from Settings stops core, socket, and tray.
+Closing the **main window** currently **hides** it (tray remains). Setting `run_in_background` is stored but does not yet change that behavior. **Sign out** clears session keys and returns to login.
 
-### 13.2 Tray menu (active buckets)
+### 13.2 Tray menu
 
-| Menu item | Action |
-|---|---|
-| 👁 Argus | Open main window |
-| ─── | — |
-| **Active buckets** (submenu) | One entry per bucket with `is_active = 1` and valid grant or user-forced active |
-| Acme Backend · 2 clients | Open bucket detail in main window |
-| ─── | — |
-| Pause all IPC | Temporary deny new grants (emergency) |
-| Sign out | Full lock |
+**Shipped:** Open Argus, Sign out.
 
-**Active bucket:** User toggles “Active in tray” on bucket detail **or** auto-active when any `client_grants` row is non-expired. Tray shows count of connected clients (from recent audit, optional).
+**Planned:** per-bucket submenu, pending client badges, Pause all IPC.
+
+| Menu item | Status | Action |
+|---|---|---|
+| Open Argus | Shipped | Show/focus main window |
+| Sign out | Shipped | Full sign-out |
+| Active buckets submenu | Planned | Open bucket detail |
+| Pause all IPC | Planned | Emergency deny new grants |
 
 ### 13.3 Plugins
 
@@ -660,7 +660,7 @@ Closing the **main window** minimizes to tray if `run_in_background = 1` (defaul
 |---|---|
 | `tauri-plugin-tray` | Icon, menu, click handlers |
 | `tauri-plugin-notification` | New client access requests |
-| Biometry plugin (community) | Login + elevation on Win/macOS |
+| Biometry plugin | Login + unlock on Win/macOS (shipped) |
 
 ---
 
@@ -754,7 +754,7 @@ argus/
 
 ### Library contract (future Python/Node — not v1 UI scope)
 
-1. Read `ARGUS_BUCKET_ID` and `ARGUS_CLIENT_TOKEN` from `.env` (or env).
+1. Read `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` from `.env` (or env).
 2. Compute canonical `uri` (project root path or registered URI).
 3. Connect to `~/.argus/argus.sock` / `\\.\pipe\argus`.
 4. Send v2 request JSON (§11.1).
