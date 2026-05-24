@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Eclipse, LayoutDashboard, Lock, Settings } from "lucide-react";
+import { Eclipse, LayoutDashboard, Lock, Package, Settings } from "lucide-react";
 
 import { cn } from "../../lib/cn";
 import { useAuthStore } from "../../state/auth-store";
@@ -7,6 +7,7 @@ import { useAuthStore } from "../../state/auth-store";
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/vault", label: "Vault", icon: Lock },
+  { to: "/buckets", label: "Buckets", icon: Package },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

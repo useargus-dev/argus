@@ -1,4 +1,4 @@
--- Argus initial schema (M3+). Forward-only migrations.
+-- Argus base schema. Fresh databases apply this file once (version 1).
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version     INTEGER PRIMARY KEY,
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS app_buckets (
   name                  TEXT NOT NULL UNIQUE,
   description           TEXT,
   client_token_hash     TEXT NOT NULL,
+  client_token_enc      TEXT,
   access_ttl_minutes    INTEGER NOT NULL DEFAULT 60,
   refresh_ttl_minutes   INTEGER,
   session_ttl_minutes   INTEGER NOT NULL DEFAULT 480,
@@ -125,4 +126,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('vault_write_requires_elevation', '1'),
   ('buckets_read_requires_elevation', '0'),
   ('buckets_write_requires_elevation', '1'),
-  ('fallback_to_dotenv', '0');
+  ('fallback_to_dotenv', '0'),
+  ('lock_on_screen_lock', '1'),
+  ('notify_client_access', '1'),
+  ('expiry_notify_days', '7');

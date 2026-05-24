@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, ShieldCheck } from "lucide-react";
 
-import { SecretDetailPanel } from "../components/secrets/secret-detail-panel";
 import { SecretFormDialog } from "../components/secrets/secret-form-dialog";
-import { SecretListPanel } from "../components/secrets/secret-list-panel";
+import { VaultLayout } from "../components/secrets/vault-layout";
 import {
   VaultFiltersBar,
   type VaultFilterState,
@@ -168,11 +167,9 @@ export function VaultPage() {
     <div className="mx-auto max-w-[1400px] px-2 py-2">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-text">
-            Vault
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-text">Vault</h1>
           <p className="mt-1 text-sm text-text-muted">
-            All secrets are encrypted at rest with your master key.
+            All secrets are encrypted with your master key.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -184,7 +181,7 @@ export function VaultPage() {
             }
           >
             <ShieldCheck className="size-3.5" aria-hidden />
-            {appUnlocked ? "Vault unlocked" : "Vault locked"}
+            {appUnlocked ? "Unlocked" : "Locked"}
           </span>
           {appUnlocked && (
             <Button
@@ -206,28 +203,20 @@ export function VaultPage() {
         </p>
       ) : (
         <>
-          <VaultFiltersBar
-            secrets={secrets}
-            filters={filters}
-            onChange={setFilters}
-          />
+          <VaultFiltersBar secrets={secrets} filters={filters} onChange={setFilters} />
 
           {listLoading ? (
             <p className="text-sm text-text-muted">Loading secrets…</p>
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,360px)_1fr]">
-              <SecretListPanel
-                secrets={filteredSecrets}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
-              <SecretDetailPanel
-                detail={detail}
-                loading={detailLoading}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-              />
-            </div>
+            <VaultLayout
+              secrets={filteredSecrets}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              detail={detail}
+              detailLoading={detailLoading}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+            />
           )}
         </>
       )}

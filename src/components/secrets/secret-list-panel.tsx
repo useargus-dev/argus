@@ -1,3 +1,6 @@
+import { ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+
 import {
   daysUntilExpiry,
   expiryBadgeTone,
@@ -5,20 +8,44 @@ import {
   secretTypeIcon,
 } from "../../lib/secret-utils";
 import { cn } from "../../lib/cn";
-import type { SecretMeta } from "../../types/secret";
+import type { SecretDetail, SecretMeta } from "../../types/secret";
 import { SecretBadge } from "./secret-badge";
+import { SecretDetailPanel } from "./secret-detail-panel";
 
 interface SecretListPanelProps {
   secrets: SecretMeta[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  detail?: SecretDetail | null;
+  detailLoading?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 export function SecretListPanel({
   secrets,
   selectedId,
   onSelect,
+  detail,
+  detailLoading = false,
+  onEdit,
+  onDelete,
 }: SecretListPanelProps) {
+  const [expanded, setExpanded] = useState(true);
+
+  useEffect(() => {
+    if (selectedId) setExpanded(true);
+  }, [selectedId]);
+
+  function handleRowClick(id: string) {
+    if (id === selectedId) {
+      setExpanded((open) => !open);
+    } else {
+      onSelect(id);
+      setExpanded(true);
+    }
+  }
+
   if (secrets.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface p-8 text-center">
@@ -30,20 +57,26 @@ export function SecretListPanel({
     );
   }
 
+  const showInlineDetail = onEdit != null && onDelete != null;
+
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface">
-      <ul className="max-h-[70vh] divide-y divide-border overflow-auto">
+    <div className="rounded-xl border border-border bg-surface lg:overflow-hidden">
+      <ul className="divide-y divide-border lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
         {secrets.map((s) => {
           const Icon = secretTypeIcon(s.secretType);
           const days = daysUntilExpiry(s.expiresAt);
           const expiryTone = days !== null ? expiryBadgeTone(days) : null;
           const selected = s.id === selectedId;
+          const isOpen = selected && expanded;
 
           return (
             <li key={s.id}>
               <button
                 type="button"
-                onClick={() => onSelect(s.id)}
+                onClick={() => handleRowClick(s.id)}
+                {...(selected
+                  ? { "aria-expanded": isOpen ? "true" : "false" }
+                  : {})}
                 className={cn(
                   "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
                   selected
@@ -65,7 +98,27 @@ export function SecretListPanel({
                     {days < 0 ? "expired" : `${days}d`}
                   </SecretBadge>
                 )}
+                {selected && showInlineDetail && (
+                  <ChevronDown
+                    className={cn(
+                      "size-4 shrink-0 text-text-muted transition-transform lg:hidden",
+                      isOpen && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                )}
               </button>
+              {showInlineDetail && isOpen && (
+                <div className="border-t border-border bg-surface-raised/40 lg:hidden">
+                  <SecretDetailPanel
+                    embedded
+                    detail={detail}
+                    loading={detailLoading}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                </div>
+              )}
             </li>
           );
         })}

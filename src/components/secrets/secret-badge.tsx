@@ -2,13 +2,14 @@ import type { ReactNode } from "react";
 
 import { cn } from "../../lib/cn";
 
-type BadgeTone = "accent" | "muted" | "danger" | "warning";
+type BadgeTone = "accent" | "muted" | "danger" | "warning" | "success";
 
 const toneClasses: Record<BadgeTone, string> = {
   accent: "bg-accent/10 text-accent border-accent/30",
   muted: "bg-surface-raised text-text-muted border-border",
   danger: "bg-danger/10 text-danger border-danger/30",
   warning: "bg-warning/10 text-warning border-warning/30",
+  success: "bg-success-muted text-success border-success-border",
 };
 
 interface SecretBadgeProps {

@@ -1,3 +1,5 @@
+pub mod bucket_mappings;
+pub mod buckets;
 pub mod meta;
 pub mod secrets;
 pub mod settings;

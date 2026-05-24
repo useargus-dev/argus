@@ -8,6 +8,7 @@ import {
   secretTypeIcon,
   secretTypeLabel,
 } from "../../lib/secret-utils";
+import { cn } from "../../lib/cn";
 import { toast } from "../../lib/toast";
 import type { SecretDetail } from "../../types/secret";
 import { Button } from "../ui/button";
@@ -20,6 +21,8 @@ interface SecretDetailPanelProps {
   loading: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  /** Inline inside list accordion (no outer card chrome). */
+  embedded?: boolean;
 }
 
 export function SecretDetailPanel({
@@ -27,7 +30,11 @@ export function SecretDetailPanel({
   loading,
   onEdit,
   onDelete,
+  embedded = false,
 }: SecretDetailPanelProps) {
+  const shell = embedded
+    ? "p-4"
+    : "rounded-xl border border-border bg-surface p-6";
   const [revealed, setRevealed] = useState(false);
   const plain = detail ? readSecretValue(detail.value) : "";
 
@@ -43,15 +50,21 @@ export function SecretDetailPanel({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-border bg-surface p-6">
+      <div className={shell}>
         <p className="text-sm text-text-muted">Loading secret…</p>
       </div>
     );
   }
 
   if (!detail) {
+    if (embedded) return null;
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-border bg-surface p-6">
+      <div
+        className={cn(
+          "flex min-h-[320px] items-center justify-center",
+          shell,
+        )}
+      >
         <p className="text-sm text-text-muted">
           Select a secret from the list or add a new one.
         </p>
@@ -72,7 +85,7 @@ export function SecretDetailPanel({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-6">
+    <div className={shell}>
       <div className="flex h-full flex-col">
         <div className="flex items-start gap-4">
           <div className="grid size-12 shrink-0 place-items-center rounded-lg border border-accent/30 bg-accent/10">

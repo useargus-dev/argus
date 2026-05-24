@@ -32,3 +32,5 @@ src-tauri/target/
 # Boneyard generated (regenerated on dev)
 src/bones/*
 !src/bones/registry.ts
+
+internal/

@@ -8,6 +8,13 @@ import type {
   TotpSetup,
   UserProfile,
 } from "../types/auth";
+import type {
+  BucketMapping,
+  BucketMeta,
+  BucketWithToken,
+  CreateBucketInput,
+  UpsertMappingInput,
+} from "../types/bucket";
 import type { SecretDetail, SecretMeta, SecretWriteInput } from "../types/secret";
 import type { SecondFactorStatus } from "../types/settings";
 
@@ -88,6 +95,19 @@ export const bridge = {
   updateSecret: (id: string, req: SecretWriteInput) =>
     call<SecretMeta>("update_secret", { id, req }),
   deleteSecret: (id: string) => call<void>("delete_secret", { id }),
+  listBuckets: () => call<BucketMeta[]>("list_buckets"),
+  createBucket: (req: CreateBucketInput) =>
+    call<BucketWithToken>("create_bucket", { req }),
+  deleteBucket: (id: string) => call<void>("delete_bucket", { id }),
+  setBucketActive: (id: string, active: boolean) =>
+    call<BucketWithToken>("set_bucket_active", { id, active }),
+  getBucketToken: (id: string) => call<string>("get_bucket_token", { id }),
+  listBucketMappings: (bucketId: string) =>
+    call<BucketMapping[]>("list_bucket_mappings", { bucketId }),
+  upsertBucketMapping: (req: UpsertMappingInput) =>
+    call<BucketMapping>("upsert_bucket_mapping", { req }),
+  deleteBucketMapping: (mappingId: string) =>
+    call<void>("delete_bucket_mapping", { mappingId }),
   getSettings: () => call<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
     call<void>("set_setting", { req: { key, value } }),
