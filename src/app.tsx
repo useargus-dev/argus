@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { Toaster } from "sonner";
-
 import { AppShell } from "./components/layout/app-shell";
+import { ArgusToaster } from "./components/ui/argus-toaster";
 import { ThemeToggle } from "./components/layout/theme-toggle";
 import { useTauriEvent } from "./hooks/use-tauri-event";
 import { bridge } from "./lib/tauri-bridge";
@@ -11,6 +10,7 @@ import { LoginPage } from "./pages/login";
 import { RegisterPage } from "./pages/register";
 import { RegisterProvisioningPage } from "./pages/register-provisioning";
 import { SettingsPage } from "./pages/settings";
+import { VaultPage } from "./pages/vault";
 import { useAuthStore } from "./state/auth-store";
 import { getStoredTheme } from "./lib/theme";
 import { useThemeStore } from "./state/theme-store";
@@ -58,8 +58,6 @@ export default function App() {
   const setSignedIn = useAuthStore((s) => s.setSignedIn);
   const clear = useAuthStore((s) => s.clear);
   const setScopes = useAuthStore((s) => s.setScopes);
-  const theme = useThemeStore((s) => s.theme);
-
   useEffect(() => {
     useThemeStore.setState({ theme: getStoredTheme() });
   }, []);
@@ -74,9 +72,13 @@ export default function App() {
 
   useTauriEvent<ScopeStatus>("scope-changed", setScopes);
 
+  useTauriEvent("app-locked", () => {
+    bridge.getScopeStatus().then(setScopes).catch(() => {});
+  });
+
   return (
     <BrowserRouter>
-      <Toaster theme={theme} position="top-right" />
+      <ArgusToaster />
       <ThemeToggle />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
@@ -105,6 +107,7 @@ export default function App() {
           }
         >
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/vault" element={<VaultPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

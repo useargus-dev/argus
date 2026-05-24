@@ -215,7 +215,7 @@ These columns are **searchable plaintext inside encrypted DB** (protected by SQL
 |---|---|
 | **APP** | Open any page (dashboard, vault view, buckets view, **settings**) |
 | **VAULT** | Create/update/delete/reveal secrets |
-| **BUCKETS** | Create/edit buckets, mappings, client tokens, per-bucket TTL |
+| **BUCKETS** | Create/edit buckets, mappings, client tokens (follows app unlock) |
 
 ### 6.2 Sign-in (APP scope)
 
@@ -224,23 +224,19 @@ Always requires:
 1. Email or username + password (Argon2id)
 2. **Second factor** — TOTP **or** biometric (mandatory from register; see §7)
 
-### 6.3 Elevation (VAULT / BUCKETS scopes)
+### 6.3 App lock vs elevation
 
-Same factor strength as sign-in:
+**Sign-in (cold start / sign-out):** password + TOTP **or** biometric. Unlocks SQLCipher and grants **APP** scope.
 
-- `elevate_vault`: password + TOTP **or** biometric → `vault_elevated_until`
-- `elevate_buckets`: password + TOTP **or** biometric → `buckets_elevated_until`
+**App lock (idle while process running):** After `auto_lock_minutes` without user activity, the app soft-locks. Keys remain in memory; **`unlock_app`** requires TOTP **or** biometric only (no password). **VAULT** scope matches **APP** — there is no separate vault idle timer.
 
-Durations from global settings (`vault_elevation_minutes`, `bucket_elevation_minutes`). Defaults: 15 minutes.
-
-**Settings page** requires APP scope only (full sign-in). Changing global TTL or security prefs does **not** require BUCKETS scope.
+**Settings page** is available when the app is unlocked. Security prefs include **`auto_lock_minutes`** only (vault and buckets share app lock).
 
 ### 6.4 Profile data
 
 | Field | Storage | Notes |
 |---|---|---|
 | `email`, `username` | Plaintext inside SQLCipher | Login identifiers only |
-| `avatar_url` | HTTPS URL only | No `data:` URIs |
 
 ### 6.5 Sign-out
 
@@ -285,7 +281,7 @@ Unix socket `0600` / Windows named pipe with user-only DACL. Socket owned by **t
 | Generation | CSPRNG 32+ bytes, prefix `ag_live_` |
 | Storage | Only `SHA-256(token)` in `client_grants.token_hash` |
 | Transmission | Client sends token once per IPC request; never log full token |
-| Rotation | Bucket settings “Regenerate token” invalidates old hashes (BUCKETS scope) |
+| Rotation | Bucket settings “Regenerate token” invalidates old hashes (requires app unlocked) |
 | Leak | User revokes grant or rotates token; shorten TTL |
 
 ### 8.3 Request validation (v2)
@@ -330,7 +326,7 @@ On Accept, `expires_at = now + effective_access_ttl`. **Refresh** (if enabled): 
 ### 9.4 Revocation
 
 - Per-grant revoke from bucket detail
-- “Revoke all clients” in settings danger zone (BUCKETS scope + password)
+- “Revoke all clients” in settings danger zone (app unlocked + password when implemented)
 
 ---
 

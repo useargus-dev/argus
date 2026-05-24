@@ -61,6 +61,8 @@ pub struct AppStateInner {
     pub register_finalize_running: bool,
     pub auth_failures: u32,
     pub auth_lockout_until: Option<DateTime<Utc>>,
+    /// UI / policy lock while keys remain in memory (re-unlock with second factor only).
+    pub app_locked: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -86,6 +88,7 @@ impl Default for AppStateInner {
             register_finalize_running: false,
             auth_failures: 0,
             auth_lockout_until: None,
+            app_locked: false,
         }
     }
 }
@@ -96,24 +99,30 @@ impl AppStateInner {
             .store(now_epoch(), Ordering::SeqCst);
     }
 
+    /// Session is active when value keys are in memory (db pool may be temporarily
+    /// detached during `with_db` queries).
     pub fn is_signed_in(&self) -> bool {
-        self.db.is_some()
+        self.value_key.is_some()
     }
 
     pub fn has_app_scope(&self) -> bool {
-        self.is_signed_in()
+        self.is_signed_in() && !self.app_locked
     }
 
+    pub fn soft_lock(&mut self) {
+        self.app_locked = true;
+        self.vault_elevated_until = None;
+        self.buckets_elevated_until = None;
+    }
+
+    /// Vault access follows app unlock (no separate vault TTL).
     pub fn has_vault_scope(&self) -> bool {
-        self.vault_elevated_until
-            .map(|t| t > Utc::now())
-            .unwrap_or(false)
+        self.has_app_scope()
     }
 
+    /// Bucket / tray admin follows app unlock (no separate buckets TTL).
     pub fn has_buckets_scope(&self) -> bool {
-        self.buckets_elevated_until
-            .map(|t| t > Utc::now())
-            .unwrap_or(false)
+        self.has_app_scope()
     }
 
     pub fn scope_status(&self) -> ScopeStatus {
@@ -121,8 +130,8 @@ impl AppStateInner {
             app: self.has_app_scope(),
             vault: self.has_vault_scope(),
             buckets: self.has_buckets_scope(),
-            vault_expires_at: self.vault_elevated_until.map(|t| t.to_rfc3339()),
-            buckets_expires_at: self.buckets_elevated_until.map(|t| t.to_rfc3339()),
+            vault_expires_at: None,
+            buckets_expires_at: None,
         }
     }
 
@@ -142,6 +151,7 @@ impl AppStateInner {
         self.register_finalize_running = false;
         self.auth_failures = 0;
         self.auth_lockout_until = None;
+        self.app_locked = false;
     }
 }
 

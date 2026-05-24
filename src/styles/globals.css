@@ -1,97 +1,148 @@
 @import "tailwindcss";
 
-/* Semantic tokens — overridden per theme on :root / .dark */
+@custom-variant dark (&:is(.dark *));
+
+/* Light — warm crisp canvas */
 :root {
-  --argus-bg: #f1f5f9;
-  --argus-surface: #ffffff;
-  --argus-surface-raised: #eef2f7;
-  --argus-surface-muted: #eff6ff;
-  --argus-border: #e2e8f0;
-  --argus-text: #0f172a;
-  --argus-text-muted: #64748b;
-  --argus-primary: #1e293b;
-  --argus-primary-hover: #334155;
-  --argus-primary-fg: #ffffff;
-  --argus-focus-ring: color-mix(in oklab, var(--argus-primary) 22%, transparent);
-  --argus-success: #16a34a;
-  --argus-success-fg: #ffffff;
-  --argus-success-muted: #dcfce7;
-  --argus-success-border: #bbf7d0;
-  --argus-warning: #d97706;
-  --argus-danger: #dc2626;
-  --argus-brand-bg: #f1f5f9;
-  --argus-brand-border: #e2e8f0;
-  --argus-brand-icon: #1e293b;
-  --argus-card-shadow: 0 1px 3px rgb(15 23 42 / 0.06), 0 1px 2px rgb(15 23 42 / 0.04);
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #f7f7f8;
+  --surface-muted: #fdf6f1;
+  --border: #ececee;
+  --text: #17191c;
+  --text-muted: #4c4c4c;
+  --accent: #17191c;
+  --accent-hover: #2a2d33;
+  --accent-foreground: #ffffff;
+  --signal: #5d2a1a;
+  --success: #2f8a4d;
+  --success-muted: #e8f5ec;
+  --success-border: #b8dfc4;
+  --warning: #c47a2a;
+  --danger: #c0392b;
+
+  --warm-mist: #fbe1d1;
+  --terracotta: #5d2a1a;
+
+  --brand-bg: var(--warm-mist);
+  --brand-border: color-mix(in oklab, var(--signal) 18%, var(--border));
+  --brand-icon: var(--signal);
+
+  --focus-ring: color-mix(in oklab, var(--signal) 22%, transparent);
+  --shadow-subtle:
+    rgba(4, 23, 43, 0.05) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.08) 0px 20px 25px -5px,
+    rgba(0, 0, 0, 0.06) 0px 8px 10px -6px;
 }
 
+/* Dark — warm ink canvas */
 .dark {
-  --argus-bg: #0c0e12;
-  --argus-surface: #141820;
-  --argus-surface-raised: #1c2230;
-  --argus-surface-muted: #1a2433;
-  --argus-border: #2a3344;
-  --argus-text: #e8edf4;
-  --argus-text-muted: #8b95a8;
-  --argus-primary: #3b9eff;
-  --argus-primary-hover: #5aafff;
-  --argus-primary-fg: #0a1628;
-  --argus-focus-ring: color-mix(in oklab, var(--argus-primary) 28%, transparent);
-  --argus-success: #34d399;
-  --argus-success-fg: #0c0e12;
-  --argus-success-muted: rgb(52 211 153 / 0.12);
-  --argus-success-border: rgb(52 211 153 / 0.35);
-  --argus-warning: #fbbf24;
-  --argus-danger: #f87171;
-  --argus-brand-bg: rgb(59 158 255 / 0.12);
-  --argus-brand-border: rgb(59 158 255 / 0.28);
-  --argus-brand-icon: #3b9eff;
-  --argus-card-shadow: none;
+  color-scheme: dark;
+
+  --bg: #0e0f12;
+  --surface: #16181c;
+  --surface-raised: #1f2125;
+  --surface-muted: #1f1c19;
+  --border: #2a2d33;
+  --text: #f4f1ec;
+  --text-muted: #a3a6af;
+  --accent: #fbe1d1;
+  --accent-hover: #ffeede;
+  --accent-foreground: #17191c;
+  --signal: #e08a64;
+  --success: #34d399;
+  --success-muted: rgb(52 211 153 / 0.12);
+  --success-border: rgb(52 211 153 / 0.35);
+  --warning: #fbbf24;
+  --danger: #f87171;
+
+  --warm-mist: #2a201a;
+  --terracotta: #e08a64;
+
+  --brand-bg: var(--warm-mist);
+  --brand-border: color-mix(in oklab, var(--terracotta) 35%, var(--border));
+  --brand-icon: var(--terracotta);
+
+  --focus-ring: color-mix(in oklab, var(--signal) 28%, transparent);
+  --shadow-subtle:
+    rgba(0, 0, 0, 0.4) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.5) 0px 20px 25px -5px,
+    rgba(0, 0, 0, 0.4) 0px 8px 10px -6px;
 }
 
-@theme {
-  --color-bg: var(--argus-bg);
-  --color-surface: var(--argus-surface);
-  --color-surface-raised: var(--argus-surface-raised);
-  --color-surface-muted: var(--argus-surface-muted);
-  --color-border: var(--argus-border);
-  --color-text: var(--argus-text);
-  --color-text-muted: var(--argus-text-muted);
-  --color-primary: var(--argus-primary);
-  --color-primary-hover: var(--argus-primary-hover);
-  --color-primary-foreground: var(--argus-primary-fg);
-  --color-accent: var(--argus-primary);
-  --color-accent-hover: var(--argus-primary-hover);
-  --color-accent-foreground: var(--argus-primary-fg);
-  --color-success: var(--argus-success);
-  --color-success-muted: var(--argus-success-muted);
-  --color-success-border: var(--argus-success-border);
-  --color-warning: var(--argus-warning);
-  --color-danger: var(--argus-danger);
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-foreground: var(--accent-foreground);
+  --color-signal: var(--signal);
+  --color-warm-mist: var(--warm-mist);
+  --color-terracotta: var(--terracotta);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-ring: var(--signal);
+
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-muted: var(--surface-raised);
+  --color-muted-foreground: var(--text-muted);
+  --color-destructive: var(--danger);
+
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
 }
 
 @layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
   body {
     margin: 0;
     min-height: 100dvh;
-    background-color: var(--argus-bg);
-    color: var(--argus-text);
+    background-color: var(--bg);
+    color: var(--text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--signal) 30%, transparent);
+    color: var(--text);
   }
 }
 
 @layer components {
   .argus-input {
     width: 100%;
-    background: var(--argus-surface-raised);
-    border: 1px solid var(--argus-border);
-    border-radius: 6px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
-    color: var(--argus-text);
+    color: var(--text);
     outline: none;
     transition:
       border-color 0.15s,
@@ -99,22 +150,21 @@
   }
 
   .argus-input::placeholder {
-    color: var(--argus-text-muted);
+    color: var(--text-muted);
   }
 
   .argus-input:focus {
-    border-color: var(--argus-primary);
-    box-shadow: 0 0 0 3px var(--argus-focus-ring);
+    border-color: var(--signal);
+    box-shadow: 0 0 0 3px var(--focus-ring);
   }
 
   .argus-card {
-    border-radius: 0.75rem;
-    border: 1px solid var(--argus-border);
-    background: var(--argus-surface);
-    box-shadow: var(--argus-card-shadow);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-subtle);
   }
 
-  /* Custom reveal only — hide Edge/WebView2 and Chromium native password UI */
   .argus-password-input::-ms-reveal,
   .argus-password-input::-ms-clear {
     display: none !important;
@@ -125,5 +175,59 @@
     -webkit-appearance: none;
     appearance: none;
     display: none !important;
+  }
+
+  [data-sonner-toaster] {
+    --width: 22rem;
+    font-family: var(--font-sans);
+  }
+
+  .argus-toast {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    box-shadow: var(--shadow-subtle) !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .argus-toast-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text);
+  }
+
+  .argus-toast-description {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .argus-toast-success {
+    border-color: var(--success-border) !important;
+  }
+
+  .argus-toast-success [data-icon] {
+    color: var(--success);
+  }
+
+  .argus-toast-info {
+    border-color: color-mix(in oklab, var(--signal) 35%, var(--border)) !important;
+  }
+
+  .argus-toast-info [data-icon] {
+    color: var(--signal);
+  }
+
+  .argus-toast-error {
+    border-color: color-mix(in oklab, var(--danger) 40%, var(--border)) !important;
+  }
+
+  .argus-toast-error [data-icon] {
+    color: var(--danger);
+  }
+
+  .argus-toast-close {
+    color: var(--text-muted) !important;
+    background: var(--surface-raised) !important;
+    border-color: var(--border) !important;
   }
 }

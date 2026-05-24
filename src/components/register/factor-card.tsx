@@ -24,11 +24,11 @@ export function FactorCard({
       className={cn(
         "rounded-lg border p-4 text-left transition-colors",
         active
-          ? "border-primary bg-surface-muted"
+          ? "border-signal bg-surface-muted"
           : "border-border bg-surface hover:border-text-muted",
       )}
     >
-      <div className={cn("mb-2", active ? "text-primary" : "text-text-muted")}>
+      <div className={cn("mb-2", active ? "text-signal" : "text-text-muted")}>
         {icon}
       </div>
       <div className="text-sm font-medium text-text">{title}</div>

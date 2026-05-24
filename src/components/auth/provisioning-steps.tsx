@@ -20,7 +20,7 @@ export function ProvisioningSteps({
             key={key}
             className={cn(
               "flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm",
-              status === "running" && "border-accent bg-surface-raised",
+              status === "running" && "border-signal bg-surface-muted",
               status === "done" && "text-success",
             )}
           >
@@ -44,6 +44,6 @@ export function ProvisioningSteps({
 function StepIcon({ status }: { status?: RegisterProgress["status"] }) {
   if (status === "done") return <Check size={18} className="text-success" />;
   if (status === "running")
-    return <Loader2 size={18} className="animate-spin text-accent" />;
+    return <Loader2 size={18} className="animate-spin text-signal" />;
   return <span className="inline-block h-[18px] w-[18px] rounded-full border border-border" />;
 }

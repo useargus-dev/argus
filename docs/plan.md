@@ -139,17 +139,17 @@ cargo test -p argus crypto::
 - [ ] `commands/auth.rs`: `register`, `sign_in`, `sign_out`, `elevate_vault`, `elevate_buckets`, `get_scope_status`, `get_profile`, `update_profile`
 - [ ] Register wizard: account → **mandatory** TOTP QR **or** biometric enroll → dashboard
 - [ ] Login: password → TOTP **or** biometric step
-- [ ] `ElevateVaultModal` / `ElevateBucketsModal` ([design.md](./design.md) §8)
-- [ ] Route guards: all pages need APP; vault writes need VAULT; bucket writes need BUCKETS
-- [ ] Settings: sign out; global TTL + elevation minutes (APP scope)
+- [ ] `AppLockModal` for idle lock ([design.md](./design.md) §8)
+- [ ] Route guards: authenticated shell; vault and buckets follow APP unlock
+- [ ] Settings: sign out; `auto_lock_minutes` only (vault shares app lock)
 - [ ] Biometry: `tauri-plugin-biometry` (Win/macOS); Linux TOTP-only path
 - [ ] Events: `signed-in`, `signed-out`, `scope-changed`
 
 **Verify:**
 
 - Cannot register without completing TOTP or biometric
-- Vault “Add secret” prompts elevation when scope missing
-- Bucket “Create” prompts BUCKETS elevation
+- Vault available whenever app is unlocked; idle app lock covers vault
+- Buckets available whenever app is unlocked (same as vault)
 - Sign out blocks all routes
 
 **Exit criteria:** Three-scope auth model working in UI + Rust.
@@ -214,7 +214,7 @@ cargo test -p argus crypto::
 
 **Deliverables:**
 
-- [ ] `db/buckets.rs` + `commands/buckets.rs` — **check BUCKETS scope** on mutations
+- [ ] `db/buckets.rs` + `commands/buckets.rs` — require app unlocked (BUCKETS follows APP)
 - [ ] Bucket columns: `access_ttl_minutes`, `refresh_ttl_minutes`, `is_tray_active`
 - [ ] Generate/display `client_token` (show once on create); store hash only
 - [ ] Frontend `/buckets` list + detail with mapping table

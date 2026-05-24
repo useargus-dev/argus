@@ -8,6 +8,8 @@ import type {
   TotpSetup,
   UserProfile,
 } from "../types/auth";
+import type { SecretDetail, SecretMeta, SecretWriteInput } from "../types/secret";
+import type { SecondFactorStatus } from "../types/settings";
 
 function parseError(err: unknown): AuthErrorPayload {
   const raw = typeof err === "string" ? err : String(err);
@@ -58,11 +60,37 @@ export const bridge = {
     useBiometric?: boolean;
   }) => call<UserProfile>("sign_in", { req }),
   signOut: () => call<void>("sign_out"),
+  unlockApp: (req: { totpCode?: string; useBiometric?: boolean }) =>
+    call<ScopeStatus>("unlock_app", { req }),
+  lockApp: () => call<ScopeStatus>("lock_app"),
   getScopeStatus: () => call<ScopeStatus>("get_scope_status"),
   getProfile: () => call<UserProfile>("get_profile"),
-  updateProfile: (avatarUrl?: string) =>
-    call<UserProfile>("update_profile", { req: { avatarUrl } }),
+  updateProfile: (req: { email?: string; username?: string }) =>
+    call<UserProfile>("update_profile", { req }),
+  getSecondFactorStatus: () =>
+    call<SecondFactorStatus>("get_second_factor_status"),
+  enrollTotp: (req: { secret: string; totpCode: string }) =>
+    call<SecondFactorStatus>("enroll_totp", { req }),
+  enrollBiometric: () => call<SecondFactorStatus>("enroll_biometric"),
+  setActiveSecondFactor: (secondFactorType: SecondFactorType) =>
+    call<SecondFactorStatus>("set_active_second_factor", {
+      req: { secondFactorType },
+    }),
   getSecondFactorType: () => call<string>("get_second_factor_type"),
+  elevateVault: (req: { totpCode?: string; useBiometric?: boolean }) =>
+    call<ScopeStatus>("elevate_vault", { req }),
+  lockVault: () => call<ScopeStatus>("lock_vault"),
+  searchSecrets: (query?: string) =>
+    call<SecretMeta[]>("search_secrets", { query: query ?? null }),
+  getSecret: (id: string) => call<SecretDetail>("get_secret", { id }),
+  createSecret: (req: SecretWriteInput) =>
+    call<SecretMeta>("create_secret", { req }),
+  updateSecret: (id: string, req: SecretWriteInput) =>
+    call<SecretMeta>("update_secret", { id, req }),
+  deleteSecret: (id: string) => call<void>("delete_secret", { id }),
+  getSettings: () => call<Record<string, string>>("get_settings"),
+  setSetting: (key: string, value: string) =>
+    call<void>("set_setting", { req: { key, value } }),
 };
 
 export type { RegisterProgress };

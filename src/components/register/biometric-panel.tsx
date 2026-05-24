@@ -44,14 +44,14 @@ export function RegisterBiometricPanel({
       disabled={loading}
       className={cn(
         "mb-4 w-full rounded-md border border-border bg-surface-muted p-4 text-center transition-colors",
-        !enrolled && "hover:border-primary/40",
+        !enrolled && "hover:border-signal/40",
         enrolled && "border-success-border",
       )}
     >
       <FingerprintPattern
         className={cn(
           "mx-auto size-10",
-          enrolled ? "text-success" : "text-primary",
+          enrolled ? "text-success" : "text-signal",
           loading && "animate-pulse",
         )}
         aria-hidden

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 
 import { ArgusInput } from "../ui/argus-input";
 import { Button } from "../ui/button";

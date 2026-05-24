@@ -178,7 +178,6 @@ fn establish_session(
             &conn,
             &draft.email,
             &draft.username,
-            None,
             &draft.password_hash,
             totp_enc.as_deref(),
             &draft.second_factor_type,
@@ -207,6 +206,7 @@ fn establish_session(
     inner.password_hash_cache = Some(draft.password_hash.clone());
     inner.register_draft = None;
     inner.pending_sign_in = None;
+    inner.app_locked = false;
 
     Ok(())
 }

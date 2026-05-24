@@ -8,14 +8,12 @@ use crate::error::{AppError, AppResult};
 pub struct UserProfile {
     pub email: String,
     pub username: String,
-    pub avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct UserRow {
     pub email: String,
     pub username: String,
-    pub avatar_url: Option<String>,
     pub password_hash: String,
     pub totp_secret: Option<String>,
     pub second_factor_type: String,
@@ -30,7 +28,7 @@ pub fn count_users(conn: &Connection) -> AppResult<i64> {
 
 pub fn get_user(conn: &Connection) -> AppResult<UserRow> {
     conn.query_row(
-        "SELECT email, username, avatar_url, password_hash, totp_secret,
+        "SELECT email, username, password_hash, totp_secret,
                 second_factor_type, totp_enabled, biometric_enrolled
          FROM users WHERE id = 'local'",
         [],
@@ -38,12 +36,11 @@ pub fn get_user(conn: &Connection) -> AppResult<UserRow> {
             Ok(UserRow {
                 email: row.get(0)?,
                 username: row.get(1)?,
-                avatar_url: row.get(2)?,
-                password_hash: row.get(3)?,
-                totp_secret: row.get(4)?,
-                second_factor_type: row.get(5)?,
-                totp_enabled: row.get::<_, i64>(6)? != 0,
-                biometric_enrolled: row.get::<_, i64>(7)? != 0,
+                password_hash: row.get(2)?,
+                totp_secret: row.get(3)?,
+                second_factor_type: row.get(4)?,
+                totp_enabled: row.get::<_, i64>(5)? != 0,
+                biometric_enrolled: row.get::<_, i64>(6)? != 0,
             })
         },
     )
@@ -55,7 +52,6 @@ pub fn get_profile(conn: &Connection) -> AppResult<UserProfile> {
     Ok(UserProfile {
         email: user.email,
         username: user.username,
-        avatar_url: user.avatar_url,
     })
 }
 
@@ -63,7 +59,6 @@ pub fn insert_user(
     conn: &Connection,
     email: &str,
     username: &str,
-    avatar_url: Option<&str>,
     password_hash: &str,
     totp_secret_enc: Option<&str>,
     second_factor_type: &str,
@@ -75,11 +70,10 @@ pub fn insert_user(
         "INSERT INTO users (
             id, email, username, avatar_url, password_hash, totp_secret,
             second_factor_type, totp_enabled, biometric_enrolled, created_at, last_signed_in_at
-        ) VALUES ('local', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+        ) VALUES ('local', ?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
         ON CONFLICT(id) DO UPDATE SET
             email = excluded.email,
             username = excluded.username,
-            avatar_url = excluded.avatar_url,
             password_hash = excluded.password_hash,
             totp_secret = excluded.totp_secret,
             second_factor_type = excluded.second_factor_type,
@@ -89,7 +83,6 @@ pub fn insert_user(
         params![
             email,
             username,
-            avatar_url,
             password_hash,
             totp_secret_enc,
             second_factor_type,
@@ -114,28 +107,82 @@ pub fn update_last_signed_in(conn: &Connection) -> AppResult<()> {
 
 pub fn update_profile(
     conn: &Connection,
-    avatar_url: Option<&str>,
+    email: Option<&str>,
+    username: Option<&str>,
 ) -> AppResult<UserProfile> {
-    if let Some(url) = avatar_url {
-        if !url.is_empty() && (!url.starts_with("https://") || url.contains(' ')) {
-            return Err(AppError::message(
-                "VALIDATION_ERROR",
-                "avatar URL must be https",
-            ));
+    if let Some(email) = email {
+        let email = email.trim().to_lowercase();
+        if email.is_empty() || !email.contains('@') {
+            return Err(AppError::message("VALIDATION_ERROR", "invalid email"));
         }
         conn.execute(
-            "UPDATE users SET avatar_url = ?1 WHERE id = 'local'",
-            [url],
+            "UPDATE users SET email = ?1 WHERE id = 'local'",
+            [email],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
+    if let Some(username) = username {
+        let username = username.trim();
+        if username.len() < 2 {
+            return Err(AppError::message("VALIDATION_ERROR", "username too short"));
+        }
+        conn.execute(
+            "UPDATE users SET username = ?1 WHERE id = 'local'",
+            [username],
         )
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
     }
     get_profile(conn)
 }
 
+pub fn set_totp_enrolled(conn: &Connection, totp_secret_enc: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE users SET totp_secret = ?1, totp_enabled = 1 WHERE id = 'local'",
+        [totp_secret_enc],
+    )
+    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
+pub fn set_biometric_enrolled(conn: &Connection, enrolled: bool) -> AppResult<()> {
+    conn.execute(
+        "UPDATE users SET biometric_enrolled = ?1 WHERE id = 'local'",
+        [if enrolled { 1 } else { 0 }],
+    )
+    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
+pub fn set_active_second_factor(conn: &Connection, second_factor_type: &str) -> AppResult<()> {
+    let user = get_user(conn)?;
+    let typ = second_factor_type.to_lowercase();
+    if typ == "totp" && !user.totp_enabled {
+        return Err(AppError::message(
+            "VALIDATION_ERROR",
+            "register TOTP before enabling it",
+        ));
+    }
+    if typ == "biometric" && !user.biometric_enrolled {
+        return Err(AppError::message(
+            "VALIDATION_ERROR",
+            "register biometric before enabling it",
+        ));
+    }
+    if typ != "totp" && typ != "biometric" {
+        return Err(AppError::message("VALIDATION_ERROR", "invalid second factor"));
+    }
+    conn.execute(
+        "UPDATE users SET second_factor_type = ?1 WHERE id = 'local'",
+        [typ],
+    )
+    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
 pub fn find_by_identifier(conn: &Connection, identifier: &str) -> AppResult<UserRow> {
     let id = identifier.trim().to_lowercase();
     conn.query_row(
-        "SELECT email, username, avatar_url, password_hash, totp_secret,
+        "SELECT email, username, password_hash, totp_secret,
                 second_factor_type, totp_enabled, biometric_enrolled
          FROM users
          WHERE lower(email) = ?1 OR lower(username) = ?1",
@@ -144,12 +191,11 @@ pub fn find_by_identifier(conn: &Connection, identifier: &str) -> AppResult<User
             Ok(UserRow {
                 email: row.get(0)?,
                 username: row.get(1)?,
-                avatar_url: row.get(2)?,
-                password_hash: row.get(3)?,
-                totp_secret: row.get(4)?,
-                second_factor_type: row.get(5)?,
-                totp_enabled: row.get::<_, i64>(6)? != 0,
-                biometric_enrolled: row.get::<_, i64>(7)? != 0,
+                password_hash: row.get(2)?,
+                totp_secret: row.get(3)?,
+                second_factor_type: row.get(4)?,
+                totp_enabled: row.get::<_, i64>(5)? != 0,
+                biometric_enrolled: row.get::<_, i64>(6)? != 0,
             })
         },
     )

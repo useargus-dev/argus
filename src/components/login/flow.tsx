@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 
 import { AuthLayout } from "../layout/auth-layout";
 import { BridgeError, bridge } from "../../lib/tauri-bridge";
@@ -41,9 +41,10 @@ export function LoginFlow() {
         const sft = err.secondFactorType ?? "totp";
         setSecondFactorType(sft as SecondFactorType);
         setStep(2);
+        toast.info("Second factor required", "Complete verification to continue");
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Sign in failed");
+      toast.fromError(err, "Sign in failed");
     } finally {
       setLoading(false);
     }

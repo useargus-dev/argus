@@ -9,7 +9,8 @@ use crate::db::argus_dir;
 use crate::error::{AppError, AppResult};
 use crate::util::{fs as argus_fs, secure};
 
-const MIGRATION_SQL: &str = include_str!("migrations/001_initial.sql");
+const MIGRATION_001: &str = include_str!("migrations/001_initial.sql");
+const MIGRATION_002: &str = include_str!("migrations/002_settings_prefs.sql");
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AccountMeta {
@@ -57,6 +58,13 @@ pub fn write_account_meta(second_factor_type: &str) -> AppResult<()> {
         has_account: true,
         second_factor_type: Some(second_factor_type.to_string()),
     };
+    write_meta(&meta)
+}
+
+pub fn update_second_factor_type(second_factor_type: &str) -> AppResult<()> {
+    let mut meta = read_meta()?;
+    meta.has_account = true;
+    meta.second_factor_type = Some(second_factor_type.to_string());
     write_meta(&meta)
 }
 
@@ -109,18 +117,25 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
         .and_then(|mut stmt| stmt.query_row([], |row| row.get(0)))
         .unwrap_or(0);
 
-    if version >= 1 {
-        return Ok(());
+    if version < 1 {
+        conn.execute_batch(MIGRATION_001)
+            .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?1)",
+            [Utc::now().to_rfc3339()],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
     }
 
-    conn.execute_batch(MIGRATION_SQL)
+    if version < 2 {
+        conn.execute_batch(MIGRATION_002)
+            .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?1)",
+            [Utc::now().to_rfc3339()],
+        )
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
-
-    conn.execute(
-        "INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?1)",
-        [Utc::now().to_rfc3339()],
-    )
-    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
 
     Ok(())
 }

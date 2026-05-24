@@ -3,7 +3,6 @@ export type SecondFactorType = "totp" | "biometric";
 export interface UserProfile {
   email: string;
   username: string;
-  avatarUrl: string | null;
 }
 
 export interface ScopeStatus {

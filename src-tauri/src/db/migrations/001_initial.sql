@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 INSERT OR IGNORE INTO settings (key, value) VALUES
   ('auto_lock_minutes', '30'),
-  ('vault_elevation_minutes', '15'),
+  ('vault_elevation_minutes', '30'),
   ('bucket_elevation_minutes', '15'),
   ('default_access_ttl_minutes', '60'),
   ('default_refresh_ttl_minutes', '0'),

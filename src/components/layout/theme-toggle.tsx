@@ -13,7 +13,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       type="button"
       onClick={toggle}
       className={cn(
-        "fixed bottom-6 right-6 z-50 grid size-11 place-items-center rounded-full border border-border bg-surface text-text shadow-md transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
+        "fixed bottom-6 right-6 z-50 grid size-11 place-items-center rounded-full border border-border bg-surface text-text shadow-[var(--shadow-subtle)] transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         className,
       )}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}

@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { Eclipse, LayoutDashboard, Settings } from "lucide-react";
+import { Eclipse, LayoutDashboard, Lock, Settings } from "lucide-react";
 
 import { cn } from "../../lib/cn";
 import { useAuthStore } from "../../state/auth-store";
 
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/vault", label: "Vault", icon: Lock },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -15,7 +16,7 @@ export function Sidebar() {
   return (
     <aside className="z-10 flex h-dvh w-60 shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-4">
-        <Eclipse className="text-primary" size={22} />
+        <Eclipse className="text-signal" size={22} />
         <span className="font-semibold text-text">Argus</span>
       </div>
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden p-3">

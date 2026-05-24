@@ -280,7 +280,7 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 
 ### 5.4 Vault (`/vault`)
 
-**Authorization:** View list with APP scope (default). **Create / edit / delete / reveal** requires **VAULT** scope — if missing, show `ElevateVaultModal` (password + TOTP or biometric).
+**Authorization:** Secrets require the app to be unlocked (**APP** / **VAULT** scope — equivalent). Idle **app lock** shows full-screen `AppLockModal` (TOTP or biometric). No separate vault elevation step or timer.
 
 **Layout:** List + detail split (or list + slide-over panel).
 
@@ -318,7 +318,7 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 
 ### 5.5 App Buckets (`/buckets`)
 
-**Authorization:** View with APP scope. **Create / edit / delete bucket, mappings, regenerate token** requires **BUCKETS** scope — `ElevateBucketsModal` if missing.
+**Authorization:** Buckets follow app unlock (**APP** / **BUCKETS** — equivalent). Idle app lock applies to tray/IPC admin the same as vault.
 
 **List view:** Cards with name, mapping count, active client grants, tray-active indicator.
 
@@ -363,22 +363,21 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 
 | Section | Contents |
 |---|---|
-| **Profile** | Avatar URL input + preview, username (read-only or editable), email (read-only) |
-| **Security** | Auto-lock, screen lock, change password, second factor type (read-only) |
-| **Access control (global)** | Default **access TTL**, default **refresh TTL**, vault/bucket elevation minutes |
-| **Background** | Run in system tray when window closed (default on) |
-| **Notifications** | Expiry thresholds; **client access** notifications |
-| **Library** | Fallback to `.env` when Argus core stopped |
-| **About** | Version, docs links, security whitepaper |
-| **Session** | **Sign out** button (full width, `variant="danger"`) |
+| **Profile** | Username, email (editable; save profile) |
+| **Security** | Auto-lock after (select), lock on screen lock (toggle), active second factor (select when both TOTP and biometric registered) |
+| **Authentication methods** | Set up / re-register TOTP (QR + code); set up / re-register biometric (Windows/macOS) |
+| **Background** | Run in system tray when window closed |
+| **Notifications** | Notify on new client access; secret expiry warning window (days) |
+| **About** | Version, license |
+| **Session** | **Sign out** (danger card) |
 
 **Sign out flow:**
 
 1. User clicks **Sign out**
-2. Confirm dialog: “Lock vault and return to sign in?”
-3. `invoke('sign_out')` → lock + clear stores → `/login`
+2. Confirm dialog
+3. `invoke('sign_out')` → zeroize keys → `/login`
 
-**Danger zone** (collapsed): change password; regenerate TOTP; revoke all client grants.
+**Not shown:** Access control TTLs, vault elevation, or `.env` fallback (library fallback is always enabled when Argus is stopped).
 
 **Requires APP scope** (full sign-in) to open Settings — same as all pages.
 
@@ -390,26 +389,12 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 
 | Chip | Meaning |
 |---|---|
-| `Vault locked` | APP only — click to elevate |
-| `Vault unlocked · 12m` | VAULT scope active |
+| `App locked` | Idle timeout — `AppLockModal` (TOTP or biometric) |
+| `App unlocked` | Dashboard, vault, settings available |
 
-Same for Buckets on `/buckets`.
+### `AppLockModal`
 
-### `ElevateVaultModal` / `ElevateBucketsModal`
-
-```
-┌──────────────────────────────────────────────┐
-│  Unlock Vault                                │
-│  Enter password and verify it's you          │
-│                                              │
-│  Password [••••••••]                         │
-│  TOTP [______]  — or —  [Use fingerprint]    │
-│                                              │
-│  [Cancel]              [Unlock for 15 min]   │
-└──────────────────────────────────────────────┘
-```
-
-Calls `elevate_vault` or `elevate_buckets`. Duration from global settings.
+Full-screen overlay when idle app lock fires. TOTP or biometric only (password not required until sign-out or app restart). Vault secrets use the same lock — no separate vault modal.
 
 ---
 
@@ -503,8 +488,7 @@ Process-path approvals (`process_path` + `working_dir`) still supported for CLI 
 | `BucketCard` | bento-style bucket summary card |
 | `BucketMappingTable` | `components/buckets/BucketMappingTable.tsx` |
 | `ClientAccessDialog` | `components/clients/ClientAccessDialog.tsx` |
-| `ElevateVaultModal` | `components/auth/ElevateVaultModal.tsx` |
-| `ElevateBucketsModal` | `components/auth/ElevateBucketsModal.tsx` |
+| `AppLockModal` | `components/app/AppLockModal.tsx` |
 | `DashboardBento` | composes dashboard tiles |
 | `RecentActivityList` | compact audit metadata (dashboard only) |
 

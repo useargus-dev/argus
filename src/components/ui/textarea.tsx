@@ -17,7 +17,7 @@ export function Textarea({ className, label, error, id, ...props }: TextareaProp
       <textarea
         id={fieldId}
         className={cn(
-          "min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent",
+          "argus-input min-h-24",
           error && "border-danger",
           className,
         )}

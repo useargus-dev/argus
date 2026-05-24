@@ -173,7 +173,7 @@ crypto/kdf.rs ──► Argon2id verify + derive db_key
 Open SQLCipher → spawn background jobs → start socket server → show tray
         │
         └──► emit "signed-in" → /dashboard
-        └──► Scopes in memory: APP = granted; VAULT = pending; BUCKETS = pending
+        └──► Scopes in memory: APP unlocked; VAULT and BUCKETS follow APP (no separate timers)
 ```
 
 **Register (first run)** must complete **one** second-factor method before the account is usable:
@@ -589,40 +589,34 @@ Lookup client_grants WHERE bucket_id + uri_hash + token_hash
 
 ## 12. Authorization Scopes
 
-Three **independent elevations** after local account exists. All use **password + second factor** (TOTP **or** biometric — same method family as login, user preference).
+One local account with **capability scopes** in Rust `AppState` (not separate users).
 
 | Scope | ID | Gates | Typical operations |
 |---|---|---|---|
-| **App shell** | `APP` | All routes including **Settings** | Sign-in, view dashboard, change global settings |
-| **Vault** | `VAULT` | `/vault` mutations | Create/update/delete/reveal secrets |
-| **Buckets** | `BUCKETS` | `/buckets` mutations | Create/edit/delete bucket, mappings, client tokens, per-bucket TTL |
+| **App shell** | `APP` | All routes including **Settings** | Dashboard, settings; cleared on idle **app lock** or sign-out |
+| **Vault** | `VAULT` | `/vault` secret CRUD | Same as **APP** while the app is unlocked (no separate vault TTL) |
+| **Buckets** | `BUCKETS` | `/buckets` mutations (future) | Same as **APP** while the app is unlocked (tray/IPC admin follows app lock) |
 
-### Elevation model (recommended)
+### Session model (implemented)
 
 ```
-sign_in()           → APP scope granted (expires: auto_lock_minutes idle OR sign_out)
-elevate_vault()     → VAULT scope granted (expires: vault_elevation_minutes, default 15)
-elevate_buckets()   → BUCKETS scope granted (expires: bucket_elevation_minutes, default 15)
+sign_in()        → password + TOTP or biometric; keys in memory; APP + VAULT effective
+unlock_app()     → TOTP or biometric after idle app lock (no password)
+sign_out()       → zeroize keys; full sign-in required on next start
+auto_lock idle   → soft app lock (keys stay in memory); VAULT follows APP
+elevate_buckets() → legacy no-op when app unlocked; buckets follow APP
 ```
 
 | Command | Validates |
 |---|---|
 | `sign_in` | email/username + password + TOTP **or** biometric |
-| `elevate_vault` | password + TOTP **or** biometric; sets `vault_elevated_until` in `AppState` |
-| `elevate_buckets` | password + TOTP **or** biometric; sets `buckets_elevated_until` |
+| `unlock_app` | TOTP **or** biometric only (after idle app lock) |
+| `elevate_vault` | Legacy no-op when app unlocked; vault follows APP |
+| `elevate_buckets` | Legacy no-op when app unlocked; buckets follow APP |
 
-**Read vs write (configurable):**
+**Vault & buckets:** No separate elevation timers. Available whenever `APP` is unlocked. Idle **`auto_lock_minutes`** soft-locks the whole app (sidebar hidden, `AppLockModal`, TOTP or biometric to resume).
 
-| Setting | Default | Behavior |
-|---|---|---|
-| `vault_read_requires_elevation` | `0` | List/search secrets with APP only |
-| `vault_write_requires_elevation` | `1` | CRUD requires VAULT scope |
-| `buckets_read_requires_elevation` | `0` | View buckets with APP only |
-| `buckets_write_requires_elevation` | `1` | Bucket CRUD requires BUCKETS scope |
-
-Frontend: entering Vault write mode or clicking “Add secret” opens **ElevateVaultModal** if scope missing. Same pattern for bucket admin actions.
-
-**Not three separate accounts** — one `users` row, three **time-bounded capability flags** in Rust memory (never stored plaintext in DB).
+**Not three separate accounts** — one `users` row, scope flags in memory (never stored plaintext in DB).
 
 ---
 
@@ -713,8 +707,7 @@ Legacy `approvals` (process_path + working_dir) may coexist for CLI until migrat
 | `default_access_ttl_minutes` | `60` | Used when bucket has no override |
 | `default_refresh_ttl_minutes` | `NULL` | Global refresh policy |
 | `run_in_background` | `1` | Close window → tray, keep IPC |
-| `vault_elevation_minutes` | `15` | VAULT scope lifetime |
-| `bucket_elevation_minutes` | `15` | BUCKETS scope lifetime |
+| `auto_lock_minutes` | `30` | Idle app lock (vault and buckets follow app) |
 
 ### Client access popup (new app)
 
@@ -798,13 +791,13 @@ Spawned when **signed in** (tray core), cancelled on **sign out**:
 
 | Key | Default | Description |
 |---|---|---|
-| `auto_lock_minutes` | `15` | Idle lock |
+| `auto_lock_minutes` | `30` | Idle app lock (vault follows app) |
 | `default_ttl_minutes` | `60` | Pre-selected approval TTL |
 | `expiry_notify_30d` | `1` | Enable 30-day warnings |
 | `expiry_notify_7d` | `1` | Enable 7-day warnings |
 | `expiry_notify_1d` | `1` | Enable 1-day warnings |
 | `verify_process_path` | `1` | Cross-check PID with sysinfo |
-| `lock_on_screen_lock` | `1` | OS lock triggers vault lock |
+| `lock_on_screen_lock` | `1` | OS lock triggers app lock (planned) |
 | `fallback_to_dotenv` | `1` | Libraries may read `.env` when locked |
 | `socket_max_message_bytes` | `65536` | Protocol limit |
 
@@ -881,11 +874,12 @@ CREATE TABLE users (
 |---|---|
 | `register` | Insert row; **require** TOTP setup **or** biometric enroll; then sign in |
 | `sign_in` | Password + TOTP **or** biometric per `second_factor_type` |
-| `elevate_vault` / `elevate_buckets` | Password + second factor → scope timestamp in `AppState` |
+| `unlock_app` | TOTP **or** biometric after idle app lock |
+| `elevate_buckets` | Legacy no-op when app unlocked |
 | `sign_out` | Stop tray, socket, zeroize keys → `signed-out` |
 | `get_scope_status` | `{ app, vault, buckets }` + `expires_at` per scope |
 | `get_profile` | Sidebar profile fields |
-| `update_profile` | `avatar_url` (https only) |
+| `update_profile` | `email`, `username` |
 
 ---
 

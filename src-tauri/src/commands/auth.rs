@@ -13,7 +13,8 @@ use crate::db::users::UserProfile;
 use crate::error::{AppError, AppResult, ErrorPayload};
 use crate::register::finalize;
 use crate::state::{AppState, PendingSignIn, RegisterDraft};
-use crate::util::{biometry, limit};
+use crate::state::ScopeStatus;
+use crate::util::{biometry, limit, second_factor, session};
 
 #[tauri::command]
 pub fn has_account() -> Result<bool, String> {
@@ -305,8 +306,10 @@ fn establish_sign_in_session(
     inner.password_hash_cache = Some(password_hash.to_string());
     inner.pending_sign_in = None;
     inner.register_draft = None;
+    inner.app_locked = false;
     limit::clear_failures(&mut inner);
 
+    inner.touch_activity();
     let scopes = inner.scope_status();
     drop(inner);
 
@@ -329,17 +332,102 @@ pub fn sign_out(app: AppHandle, state: State<'_, AppState>) -> Result<(), String
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_scope_status(state: State<'_, AppState>) -> Result<crate::state::ScopeStatus, String> {
-    let inner = state
-        .0
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
-    Ok(inner.scope_status())
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnlockAppRequest {
+    pub totp_code: Option<String>,
+    pub use_biometric: Option<bool>,
 }
 
 #[tauri::command]
-pub fn get_profile(state: State<'_, AppState>) -> Result<UserProfile, String> {
+pub fn unlock_app(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    req: UnlockAppRequest,
+) -> Result<ScopeStatus, String> {
+    run_unlock_app(&app, &state, req).map_err(|e| String::from(e))
+}
+
+fn run_unlock_app(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    req: UnlockAppRequest,
+) -> AppResult<ScopeStatus> {
+    {
+        let inner = state
+            .0
+            .lock()
+            .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
+        if !inner.is_signed_in() {
+            return Err(AppError::message("NOT_SIGNED_IN", "not signed in"));
+        }
+        if !inner.app_locked {
+            return Ok(inner.scope_status());
+        }
+    }
+
+    second_factor::verify_second_factor(
+        app,
+        state,
+        second_factor::SecondFactorProof {
+            totp_code: req.totp_code.as_deref(),
+            use_biometric: req.use_biometric.unwrap_or(false),
+        },
+    )?;
+
+    let scopes = {
+        let mut inner = state
+            .0
+            .lock()
+            .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
+        inner.app_locked = false;
+        inner.touch_activity();
+        limit::clear_failures(&mut inner);
+        inner.scope_status()
+    };
+
+    let _ = app.emit("scope-changed", scopes.clone());
+    Ok(scopes)
+}
+
+#[tauri::command]
+pub fn lock_app(app: AppHandle, state: State<'_, AppState>) -> Result<ScopeStatus, String> {
+    session::soft_lock_app(&app, &state).map_err(|e| String::from(e))
+}
+
+#[tauri::command]
+pub fn get_scope_status(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<crate::state::ScopeStatus, String> {
+    let signed_in = {
+        let inner = state
+            .0
+            .lock()
+            .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
+        inner.is_signed_in()
+    };
+    if !signed_in {
+        return Ok(crate::state::ScopeStatus {
+            app: false,
+            vault: false,
+            buckets: false,
+            vault_expires_at: None,
+            buckets_expires_at: None,
+        });
+    }
+    // Poll-only: check idle without resetting the activity timer.
+    session::poll_idle_app_lock(&app, &state).map_err(|e| String::from(e))?;
+    session::scope_status_after_sync(&app, &state).map_err(|e| String::from(e))
+}
+
+#[tauri::command]
+pub fn get_profile(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UserProfile, String> {
+    session::touch_and_check_auto_lock(&app, &state, true).map_err(|e| String::from(e))?;
+
     let inner = state
         .0
         .lock()
@@ -352,32 +440,6 @@ pub fn get_profile(state: State<'_, AppState>) -> Result<UserProfile, String> {
         .lock()
         .map_err(|_| AppError::message("LOCK_ERROR", "db poisoned"))?;
     users::get_profile(&conn).map_err(|e| String::from(e))
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateProfileRequest {
-    pub avatar_url: Option<String>,
-}
-
-#[tauri::command]
-pub fn update_profile(
-    state: State<'_, AppState>,
-    req: UpdateProfileRequest,
-) -> Result<UserProfile, String> {
-    let inner = state
-        .0
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
-    let pool = inner
-        .db
-        .as_ref()
-        .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
-    let conn = pool
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "db poisoned"))?;
-    users::update_profile(&conn, req.avatar_url.as_deref())
-        .map_err(|e| String::from(e))
 }
 
 #[tauri::command]

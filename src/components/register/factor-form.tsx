@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FingerprintPattern, QrCode } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 
 import { isBiometricPlatform, biometryAvailable } from "../auth/biometric-button";
 import { Button } from "../ui/button";
