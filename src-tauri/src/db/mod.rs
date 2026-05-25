@@ -1,11 +1,13 @@
 pub mod bucket_mappings;
 pub mod buckets;
+pub mod client_grants;
+pub mod ipc_env;
 pub mod meta;
 pub mod secrets;
 pub mod settings;
 pub mod users;
 
-pub use meta::reset_local_data;
+pub use meta::{ensure_argus_dir, reset_local_data};
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -14,7 +16,7 @@ use hex::encode as hex_encode;
 use rusqlite::Connection;
 use secrecy::{ExposeSecret, SecretBox};
 
-use crate::db::meta::{db_path, ensure_argus_dir, run_migrations};
+use crate::db::meta::{db_path, run_migrations};
 use crate::util::fs as argus_fs;
 use crate::error::{AppError, AppResult};
 

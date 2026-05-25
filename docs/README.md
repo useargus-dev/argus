@@ -24,5 +24,5 @@ Older docs may mention separate “elevate vault/buckets” steps; that was simp
 ## Before you ship or fork
 
 - Read [security.md](./security.md) § Known limitations.
-- IPC and client libraries are **planned**. Tray icon + hide-on-close are **shipped**; full background IPC service is **planned** — see [architecture.md](./architecture.md) §13 and [plan.md](./plan.md).
+- **IPC** (socket/pipe, grants, approval dialog) and **tray** (hide-on-close) are **shipped**. **Client libraries** are **planned** — see [architecture.md](./architecture.md) §11 and `pnpm ipc:test` (`scripts/ipc-request.ts`).
 - **Licensing:** community code is [AGPL-3.0](../LICENSE); proprietary/self-hosted offerings use [COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md).

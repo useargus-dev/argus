@@ -10,9 +10,11 @@
 - Registration with password + **TOTP** or **biometric** unlock
 - **Vault** — typed secrets, tags, filters, expiry
 - **App buckets** — map env names to vault secrets; per-bucket client tokens
-- **Settings** — security, notifications, tray preference (close hides to tray; full background IPC not shipped yet)
+- **Settings** — security, notifications, tray preference (close hides to tray when signed in)
+- **Local IPC** — apps request bucket env vars via `\\.\pipe\argus` (Windows) or `~/.argus/argus.sock` (macOS/Linux); first connect shows an approval dialog; grants stored with TTL
+- **System tray** — hide on close, Open / Sign out; IPC server runs while signed in
 
-**Planned (not yet shipped):** local IPC for apps (`argus.sock`), client approval popups, Python/Node client libraries. See [docs/plan.md](docs/plan.md).
+**Planned:** packaged client libraries wrapping IPC. Test with `pnpm ipc:test`. See [docs/architecture.md](docs/architecture.md) §11.
 
 ## Quick start
 
@@ -39,6 +41,8 @@ pnpm tauri dev
 |------|---------|
 | `~/.argus/argus.db` | Encrypted database |
 | `~/.argus/` | App data (see [architecture](docs/architecture.md)) |
+| `~/.argus/argus.sock` | IPC endpoint (Unix; while signed in) |
+| `\\.\pipe\argus` | IPC endpoint (Windows; while signed in) |
 
 Never commit real bucket IDs, tokens, or database files.
 

@@ -15,6 +15,7 @@ import type {
   CreateBucketInput,
   UpsertMappingInput,
 } from "../types/bucket";
+import type { ClientAccessRequest } from "../types/client";
 import type { SecretDetail, SecretMeta, SecretWriteInput } from "../types/secret";
 import type { SecondFactorStatus } from "../types/settings";
 
@@ -111,6 +112,15 @@ export const bridge = {
   getSettings: () => call<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
     call<void>("set_setting", { req: { key, value } }),
+  listPendingClientAccess: () =>
+    call<ClientAccessRequest[]>("list_pending_client_access"),
+  respondToClientAccess: (req: {
+    requestId: string;
+    accept: boolean;
+    ttlMinutes?: number;
+  }) => call<void>("respond_to_client_access", { req }),
+  pendingClientAccessCount: () =>
+    call<number>("pending_client_access_count"),
 };
 
 export type { RegisterProgress };

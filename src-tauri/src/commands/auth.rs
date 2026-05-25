@@ -316,6 +316,8 @@ fn establish_sign_in_session(
     let _ = app.emit("signed-in", profile.clone());
     let _ = app.emit("scope-changed", scopes);
 
+    crate::ipc::start_for_app(app);
+
     Ok(profile)
 }
 
@@ -328,6 +330,7 @@ pub fn sign_out(app: AppHandle, state: State<'_, AppState>) -> Result<(), String
     inner.clear_session();
     inner.register_draft = None;
     drop(inner);
+    crate::ipc::stop_for_app(&app);
     let _ = app.emit("signed-out", ());
     Ok(())
 }

@@ -12,6 +12,7 @@ import { RegisterProvisioningPage } from "./pages/register-provisioning";
 import { BucketDetailPage } from "./pages/bucket-detail";
 import { BucketsPage } from "./pages/buckets";
 import { SettingsPage } from "./pages/settings";
+import { RequestsPage } from "./pages/requests";
 import { VaultPage } from "./pages/vault";
 import { useAuthStore } from "./state/auth-store";
 import { getStoredTheme } from "./lib/theme";
@@ -78,10 +79,12 @@ export default function App() {
     bridge.getScopeStatus().then(setScopes).catch(() => {});
   });
 
+  const isRequestsWindow = window.location.pathname === "/requests";
+
   return (
     <BrowserRouter>
       <ArgusToaster />
-      <ThemeToggle />
+      {!isRequestsWindow && <ThemeToggle />}
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<LoginPage />} />
@@ -101,6 +104,7 @@ export default function App() {
             </RequireNoAccount>
           }
         />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route
           element={
             <RequireAuth>

@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use crate::error::AppResult;
+#[allow(unused_imports)]
+use crate::error::{AppError, AppResult};
 
 /// Restrict access to the Argus data directory and files (Unix modes + Windows ACL best-effort).
 pub fn harden_path(path: &Path, is_dir: bool) -> AppResult<()> {

@@ -9,7 +9,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "db:reset": "tsx scripts/reset-db.ts"
+    "db:reset": "tsx scripts/reset-db.ts",
+    "ipc:test": "tsx scripts/ipc-request.ts"
   },
   "dependencies": {
     "@choochmeque/tauri-plugin-biometry-api": "^0.2.8",

@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 
 import { AppLockModal } from "../app/app-lock-modal";
+import { useTauriEvent } from "../../hooks/use-tauri-event";
 import { bridge } from "../../lib/tauri-bridge";
 import { useAuthStore } from "../../state/auth-store";
+import type { ClientAccessRequest } from "../../types/client";
 import { Sidebar } from "./sidebar";
 
 function SessionWatchdog() {
@@ -29,6 +31,10 @@ function SessionWatchdog() {
 export function AppShell() {
   const scopes = useAuthStore((s) => s.scopes);
   const appLocked = scopes !== null && !scopes.app;
+
+  useTauriEvent<ClientAccessRequest>("client-access-requested", () => {
+    // The Rust backend opens the "requests" window automatically.
+  });
 
   return (
     <div className="flex h-dvh overflow-hidden bg-bg">

@@ -3,7 +3,7 @@
 > **Argus** is a local-first secrets vault and approval gateway for developer environments.  
 > One encrypted database. One OS user. Zero cloud. Secrets leave the machine only when a human approves a specific process identity.
 
-> **Implementation note:** Sections marked **(shipped)** reflect the current desktop app. Sections on **IPC**, **client grants runtime**, and **full tray background service** are **planned** unless stated otherwise. For a short “what works today” list, see [README](../README.md) and [docs/README.md](./README.md).
+> **Implementation note:** **IPC** (local socket/pipe + grants + approval UI) and **tray hide-on-close** are **shipped** on desktop. **Python/Node client libraries** and advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
 
 **Related documents:** [plan.md](./plan.md) · [design.md](./design.md) · [security.md](./security.md)
 
@@ -515,9 +515,9 @@ Full threat analysis: [security.md](./security.md).
 
 ---
 
-## 11. IPC & Socket Server **(planned)**
+## 11. IPC & Socket Server **(shipped)**
 
-Socket server will run in **Argus core** (tray process), not only when the main window is open. **Not implemented in v0.1.**
+Socket server runs while the user is **signed in** (starts on sign-in, stops on sign-out). The main window may be hidden; IPC stays up when **Run in background** is enabled.
 
 ### 11.1 Request (client → Argus) — v2 protocol
 
@@ -540,8 +540,9 @@ Used by future Python/Node libraries (not in current implementation scope). Lega
 |---|---|---|
 | `bucket_id` | Yes | App bucket / “app id” (`ARGUS_BUCKET_ID` in project) |
 | `client_token` | Yes | Secret issued in bucket settings or after first approval |
-| `uri` | Yes | Stable client identity (project path, `app://` scheme, or registered URI) |
-| `process_*`, `pid` | Recommended | Display + optional `sysinfo` verification |
+| `uri` | No (optional) | If sent, must match OS-verified URI or request fails with `URI_MISMATCH` |
+| Grant URI | Server | Canonical `file://` from **peer process cwd** at connect time |
+| `process_*`, `pid` | Server | Resolved via pipe/socket peer PID + `sysinfo` (shown in approval UI) |
 
 **`uri` normalization (Rust):** lowercase scheme, resolve `.` segments, canonical path — hash stored as `uri_hash` for grant lookup.
 

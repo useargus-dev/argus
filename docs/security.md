@@ -3,7 +3,7 @@
 > This document is the authoritative security specification for Argus.  
 > It defines threats, controls, cryptographic parameters, and release checklists.  
 > Researchers: start with [SECURITY.md](../SECURITY.md) at the repository root.  
-> **IPC / client grants / socket server** sections describe the **target** design; they are **not fully implemented** in v0.1.
+> **IPC / client grants / socket server** are **shipped** on desktop (v0.1): local socket/pipe, grant table, approval UI. Client libraries (Python/Node) remain **planned**.
 
 **Related:** [architecture.md](./architecture.md) · [plan.md](./plan.md)
 
@@ -271,35 +271,32 @@ Biometric unlocks a **device-bound** key in OS secure storage — it does **not*
 
 ## 8. IPC, Client Tokens & Socket Hardening
 
-*Target design — not implemented in v0.1.*
+**Shipped** on desktop while signed in and app unlocked.
 
 ### 8.1 Transport
 
-*Planned.*
-
-Unix socket `0600` / Windows named pipe with user-only DACL. Socket will be owned by **tray core**, not only when UI window is open. **Not running in v0.1.**
+Unix socket `~/.argus/argus.sock` (`0600` after bind) / Windows named pipe `\\.\pipe\argus`. Server starts on sign-in, stops on sign-out. Window may be hidden (tray) while IPC stays up if **Run in background** is enabled.
 
 ### 8.2 Bucket client token security
 
-*Partially shipped (desktop UI + DB); IPC validation planned.*
-
-Desktop UI shows `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` in project `.env`. IPC validation is planned.
+Desktop UI shows `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` in project `.env`. IPC validates token hash per request.
 
 | Property | Implementation |
 |---|---|
-| Generation **(shipped)** | CSPRNG **32** alphanumeric characters (`app_buckets` / `get_bucket_token`) |
-| Storage **(shipped)** | `SHA-256(token)` in `app_buckets.client_token_hash`; encrypted token in `client_token_enc` |
-| IPC grants **(planned)** | `client_grants` table for approved bucket + uri + token |
-| Transmission **(planned)** | Client sends token once per IPC request; never log full token |
-| Rotation **(shipped)** | Toggle bucket active regenerates token; UI copy/reveal in bucket detail |
-| Leak | User rotates token; shorten TTL when IPC ships |
+| Generation | CSPRNG **32** alphanumeric characters (`app_buckets` / `get_bucket_token`) |
+| Storage | `SHA-256(token)` in `app_buckets.client_token_hash`; encrypted token in `client_token_enc` |
+| IPC grants | `client_grants` table for approved bucket + uri + token |
+| Transmission | Client sends token once per IPC request; never log full token |
+| Rotation | Toggle bucket active regenerates token; UI copy/reveal in bucket detail |
+| Leak | User rotates token; shorten bucket TTL or deny grants |
 
 ### 8.3 Request validation (v2)
 
-- `bucket_id`, `uri`, `client_token` required
-- Normalize `uri` before hash
+- `bucket_id`, `client_token` required
+- **Grant URI is OS-derived** from the peer process working directory (`GetNamedPipeClientProcessId` / `SO_PEERCRED` / `LOCAL_PEERPID` → `sysinfo` exe + cwd → canonical `file://` URI)
+- Optional client `uri` in JSON is **rejected** if it does not match the verified URI (`URI_MISMATCH`)
 - Constant-time compare on token hash
-- Optional `sysinfo` PID/path cross-check
+- Linux: `SO_PEERCRED` UID must match Argus; Windows: same session check on pipe client PID
 
 ### 8.4 Core must be signed in
 
@@ -590,11 +587,11 @@ Report via **[SECURITY.md](../SECURITY.md)** (GitHub Security Advisories). Do no
 | Per-value AES-GCM | Shipped |
 | Auto-lock (idle) | Shipped |
 | CSP + capabilities | Shipped |
-| Client grants + IPC socket | Planned |
-| Process approval gate | Planned |
+| Client grants + IPC socket | Shipped |
+| Process approval gate | Shipped |
 | Append-only audit (full) | Partial / planned |
 | Screen lock integration | Planned |
-| Type-based inject blocking (IPC) | Planned |
+| Type-based inject blocking (IPC) | Shipped |
 | Isolation pattern | Recommended |
 | OS keychain pepper | Future |
 | Hardware security key | Future |

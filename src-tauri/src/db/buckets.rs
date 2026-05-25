@@ -45,7 +45,7 @@ pub fn generate_bucket_token() -> String {
         .collect()
 }
 
-fn hash_token(token: &str) -> String {
+pub fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
     hex::encode(hasher.finalize())
@@ -195,6 +195,35 @@ pub fn set_bucket_active(
     persist_token(conn, value_key, id, &token)?;
     let meta = get_bucket_meta(conn, id)?;
     Ok(BucketWithToken { meta, token })
+}
+
+pub fn verify_client_token(
+    conn: &Connection,
+    bucket_id: &str,
+    client_token: &str,
+) -> AppResult<BucketMeta> {
+    let meta = get_bucket_meta(conn, bucket_id)?;
+    if !meta.is_active {
+        return Err(AppError::message(
+            "BUCKET_INACTIVE",
+            "bucket is not active",
+        ));
+    }
+    let expected: String = conn
+        .query_row(
+            "SELECT client_token_hash FROM app_buckets WHERE id = ?1",
+            [bucket_id],
+            |r| r.get(0),
+        )
+        .map_err(|_| AppError::message("NOT_FOUND", "bucket not found"))?;
+    let got = hash_token(client_token);
+    if got != expected {
+        return Err(AppError::message(
+            "INVALID_TOKEN",
+            "invalid client token",
+        ));
+    }
+    Ok(meta)
 }
 
 pub fn get_bucket_token(

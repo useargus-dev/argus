@@ -2,18 +2,23 @@ mod commands;
 pub mod crypto;
 pub mod db;
 mod error;
+mod ipc;
 mod register;
+mod sessions;
 mod state;
 mod util;
 
 use state::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_biometry::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
+        .manage(ipc::IpcRuntime::default())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -22,8 +27,9 @@ pub fn run() {
                 use tauri::Manager;
 
                 let open_i = MenuItem::with_id(app, "open", "Open Argus", true, None::<&str>)?;
+                let requests_i = MenuItem::with_id(app, "requests", "Access Requests", true, None::<&str>)?;
                 let quit_i = MenuItem::with_id(app, "quit", "Sign out", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&open_i, &quit_i])?;
+                let menu = Menu::with_items(app, &[&open_i, &requests_i, &quit_i])?;
                 let Some(icon) = app.default_window_icon().cloned() else {
                     return Ok(());
                 };
@@ -36,6 +42,8 @@ pub fn run() {
                                 let _ = w.show();
                                 let _ = w.set_focus();
                             }
+                        } else if event.id.as_ref() == "requests" {
+                            show_requests_window(app);
                         } else if event.id.as_ref() == "quit" {
                             let state = app.state::<AppState>();
                             let _ = commands::auth::sign_out(app.clone(), state);
@@ -61,8 +69,11 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                let hide_to_tray = should_run_in_background(&window.app_handle());
+                if hide_to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -100,7 +111,54 @@ pub fn run() {
             commands::buckets::delete_bucket_mapping,
             commands::settings::get_settings,
             commands::settings::set_setting,
+            commands::clients::list_pending_client_access,
+            commands::clients::respond_to_client_access,
+            commands::clients::pending_client_access_count,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn should_run_in_background(app: &tauri::AppHandle) -> bool {
+    use tauri::Manager;
+    let state = app.state::<AppState>();
+    let inner = match state.0.lock() {
+        Ok(g) => g,
+        Err(_) => return true,
+    };
+    if !inner.is_signed_in() {
+        return false;
+    }
+    let pool = match inner.db.as_ref() {
+        Some(p) => p,
+        None => return true,
+    };
+    let conn = match pool.lock() {
+        Ok(c) => c,
+        Err(_) => return true,
+    };
+    crate::db::settings::get_or_default(&conn, "run_in_background", "1")
+        .map(|v| v == "1")
+        .unwrap_or(true)
+}
+
+fn show_requests_window(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(w) = app.get_webview_window("requests") {
+        let _ = w.show();
+        let _ = w.set_focus();
+    } else {
+        let _ = tauri::WebviewWindowBuilder::new(
+            app,
+            "requests",
+            tauri::WebviewUrl::App("/requests".into()),
+        )
+        .title("Argus — Access Requests")
+        .inner_size(420.0, 500.0)
+        .min_inner_size(360.0, 300.0)
+        .resizable(true)
+        .always_on_top(true)
+        .center()
+        .build();
+    }
 }
