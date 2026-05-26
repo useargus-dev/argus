@@ -346,11 +346,16 @@ function GrantDetailsModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div
+        className="absolute inset-0"
+        role="button"
+        tabIndex={-1}
+        aria-label="Close dialog"
+        onClick={onClose}
+        onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      />
+      <div className="relative w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-text">Grant Details</h3>
           <button

@@ -219,7 +219,7 @@ export function BucketMappingsPanel({
                       disabled={savingKey === rowKey}
                     />
                   </label>
-                  <label className="min-w-0">
+                  <div className="min-w-0">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                       Type
                     </span>
@@ -228,7 +228,7 @@ export function BucketMappingsPanel({
                       onChange={(mappingType) => setEdit(mapping.id, { mappingType })}
                       disabled={savingKey === rowKey}
                     />
-                  </label>
+                  </div>
                   <div className="min-w-0">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                       Value
@@ -304,7 +304,7 @@ export function BucketMappingsPanel({
                     disabled={savingKey === draft.key}
                   />
                 </label>
-                <label className="min-w-0">
+                <div className="min-w-0">
                   <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                     Type
                   </span>
@@ -313,7 +313,7 @@ export function BucketMappingsPanel({
                     onChange={(mappingType) => updateDraft(draft.key, { mappingType })}
                     disabled={savingKey === draft.key}
                   />
-                </label>
+                </div>
                 <div className="min-w-0">
                   <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                     Value
