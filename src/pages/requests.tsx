@@ -151,6 +151,42 @@ function RequestCard({
   );
 }
 
+function TrayHeader({ count }: { count?: number }) {
+  return (
+    <header className="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between">
+      <h1 className="text-sm font-semibold text-text">
+        Approvals
+        {count != null && count > 0 && (
+          <span className="ml-1 text-text-muted">({count})</span>
+        )}
+      </h1>
+      <button
+        type="button"
+        onClick={() => {
+          import("@tauri-apps/api/core").then(({ invoke }) => {
+            invoke("show_main_window").catch(() => {});
+          });
+        }}
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-text-muted hover:bg-surface-raised hover:text-text transition-colors"
+      >
+        Open Argus
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="h-3 w-3"
+        >
+          <path
+            fillRule="evenodd"
+            d="M4.22 11.78a.75.75 0 0 1 0-1.06L9.44 5.5H5.75a.75.75 0 0 1 0-1.5h5.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V6.56l-5.22 5.22a.75.75 0 0 1-1.06 0Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+    </header>
+  );
+}
+
 export function RequestsPage() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [requests, setRequests] = useState<ClientAccessRequest[]>([]);
@@ -193,71 +229,52 @@ export function RequestsPage() {
 
   if (signedIn === null) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-bg p-4">
-        <p className="text-sm text-text-muted">Loading...</p>
+      <div className="flex h-dvh flex-col bg-bg">
+        <TrayHeader />
+        <div className="flex flex-1 items-center justify-center p-4">
+          <p className="text-sm text-text-muted">Loading...</p>
+        </div>
       </div>
     );
   }
 
   if (!signedIn) {
     return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-bg p-6 text-center">
-        <p className="text-sm text-text-muted">
-          You are not signed in to Argus.
-        </p>
-        <Button
-          variant="primary"
-          onClick={() => {
-            import("@tauri-apps/api/core").then(({ invoke }) => {
-              invoke("show_main_window").catch(() => {});
-            });
-          }}
-        >
-          Sign in to Argus
-        </Button>
+      <div className="flex h-dvh flex-col bg-bg">
+        <TrayHeader />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+          <p className="text-sm text-text-muted">
+            You are not signed in to Argus.
+          </p>
+          <Button
+            variant="primary"
+            onClick={() => {
+              import("@tauri-apps/api/core").then(({ invoke }) => {
+                invoke("show_main_window").catch(() => {});
+              });
+            }}
+          >
+            Sign in to Argus
+          </Button>
+        </div>
       </div>
     );
   }
 
   if (requests.length === 0) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-bg p-4">
-        <p className="text-sm text-text-muted">No pending requests</p>
+      <div className="flex h-dvh flex-col bg-bg">
+        <TrayHeader />
+        <div className="flex flex-1 items-center justify-center p-4">
+          <p className="text-sm text-text-muted">No pending requests</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-dvh flex-col bg-bg">
-      <header className="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between">
-        <h1 className="text-sm font-semibold text-text">
-          Approvals{" "}
-          <span className="ml-1 text-text-muted">({requests.length})</span>
-        </h1>
-        <button
-          type="button"
-          onClick={() => {
-            import("@tauri-apps/api/core").then(({ invoke }) => {
-              invoke("show_main_window").catch(() => {});
-            });
-          }}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-text-muted hover:bg-surface-raised hover:text-text transition-colors"
-        >
-          Open Argus
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            className="h-3 w-3"
-          >
-            <path
-              fillRule="evenodd"
-              d="M4.22 11.78a.75.75 0 0 1 0-1.06L9.44 5.5H5.75a.75.75 0 0 1 0-1.5h5.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V6.56l-5.22 5.22a.75.75 0 0 1-1.06 0Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </header>
+      <TrayHeader count={requests.length} />
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {requests.map((r) => (
           <RequestCard key={r.requestId} request={r} onResolved={refresh} />

@@ -172,6 +172,7 @@ export function BucketMappingsPanel({
           variant="secondary"
           className="h-9 gap-1.5 text-sm"
           onClick={addDraftRow}
+          disabled={drafts.length > 0}
         >
           <Plus className="size-4" aria-hidden />
           Add mapping
