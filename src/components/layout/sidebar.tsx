@@ -1,15 +1,24 @@
 import { NavLink } from "react-router-dom";
-import { Eclipse, LayoutDashboard, Lock, Package, Settings } from "lucide-react";
+import { Eclipse, KeyRound, LayoutDashboard, Package, Settings, ShieldCheck } from "lucide-react";
 
 import { cn } from "../../lib/cn";
 import { useAuthStore } from "../../state/auth-store";
 
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/vault", label: "Vault", icon: Lock },
+  { to: "/vault", label: "Vault", icon: KeyRound },
   { to: "/buckets", label: "Buckets", icon: Package },
+  { to: "/approvals", label: "Approvals", icon: ShieldCheck },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
+
+function getInitials(username: string): string {
+  const parts = username.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return username.slice(0, 2).toUpperCase();
+}
 
 export function Sidebar() {
   const profile = useAuthStore((s) => s.profile);
@@ -40,11 +49,16 @@ export function Sidebar() {
         ))}
       </nav>
       {profile && (
-        <div className="shrink-0 border-t border-border p-4">
-          <p className="truncate text-sm font-medium text-text">
-            {profile.username}
-          </p>
-          <p className="truncate text-xs text-text-muted">{profile.email}</p>
+        <div className="flex shrink-0 items-center gap-3 border-t border-border p-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-full border border-accent/30 bg-accent/15 text-xs font-semibold text-accent">
+            {getInitials(profile.username)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-text">
+              {profile.username}
+            </p>
+            <p className="truncate text-xs text-text-muted">{profile.email}</p>
+          </div>
         </div>
       )}
     </aside>

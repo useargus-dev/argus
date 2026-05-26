@@ -15,7 +15,7 @@ import type {
   CreateBucketInput,
   UpsertMappingInput,
 } from "../types/bucket";
-import type { ClientAccessRequest } from "../types/client";
+import type { ClientAccessRequest, GrantRow } from "../types/client";
 import type { SecretDetail, SecretMeta, SecretWriteInput } from "../types/secret";
 import type { SecondFactorStatus } from "../types/settings";
 
@@ -121,6 +121,10 @@ export const bridge = {
   }) => call<void>("respond_to_client_access", { req }),
   pendingClientAccessCount: () =>
     call<number>("pending_client_access_count"),
+  isSignedIn: () => call<boolean>("is_signed_in"),
+  listGrants: () => call<GrantRow[]>("list_grants"),
+  revokeGrant: (grantId: string) =>
+    call<void>("revoke_grant", { grantId }),
 };
 
 export type { RegisterProgress };

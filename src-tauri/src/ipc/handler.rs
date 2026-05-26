@@ -35,7 +35,7 @@ pub async fn handle_request(
     let request_id = req.request_id.clone();
 
     let state = app.state::<AppState>();
-    let session_ok = {
+    let signed_in = {
         let inner = match state.0.lock() {
             Ok(g) => g,
             Err(_) => {
@@ -47,23 +47,13 @@ pub async fn handle_request(
                 .to_line();
             }
         };
-        inner.is_signed_in() && inner.has_app_scope()
+        inner.is_signed_in()
     };
 
-    if !session_ok {
-        let msg = if state
-            .0
-            .lock()
-            .map(|i| i.is_signed_in() && i.app_locked)
-            .unwrap_or(false)
-        {
-            "Argus is locked — unlock the app to approve access"
-        } else {
-            "Argus is not signed in"
-        };
+    if !signed_in {
         return IpcResponse::Locked {
             request_id,
-            message: msg.into(),
+            message: "Argus is not signed in".into(),
         }
         .to_line();
     }

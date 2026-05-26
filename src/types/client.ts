@@ -14,3 +14,15 @@ export interface ClientAccessRequest {
   accessTtlMinutes: number;
   createdAt: string;
 }
+
+export interface GrantRow {
+  id: string;
+  bucketId: string;
+  bucketName: string;
+  fingerprint: string;
+  clientLabel?: string | null;
+  grantedAt: string;
+  expiresAt: string;
+  lastSeenAt?: string | null;
+  isActive: boolean;
+}

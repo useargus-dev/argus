@@ -7,6 +7,7 @@ use sysinfo::{Pid, ProcessesToUpdate, System};
 use crate::error::{AppError, AppResult};
 
 use super::machine_id;
+use super::proc_info;
 
 /// Complete peer fingerprint derived from OS process inspection.
 #[derive(Debug, Clone)]
@@ -51,28 +52,42 @@ impl VerifiedClient {
                 )
             })?;
 
-        let (cwd, cwd_verified) = match proc.cwd().map(|p| p.to_string_lossy().into_owned()).filter(|s| !s.is_empty()) {
-            Some(d) => (d, true),
-            None => {
-                if let Some(fb) = fallback_cwd.filter(|s| !s.is_empty()) {
-                    (fb.to_string(), false)
-                } else {
-                    let parent = PathBuf::from(&exe_path)
-                        .parent()
-                        .map(|p| p.to_string_lossy().into_owned())
-                        .unwrap_or_default();
-                    if parent.is_empty() {
-                        return Err(AppError::message(
-                            "PEER_RESOLVE",
-                            format!("could not determine working directory for pid {pid}"),
-                        ));
-                    }
-                    (parent, false)
+        // Use native OS APIs for cmd line and cwd (sysinfo is unreliable on Windows)
+        let native_info = proc_info::read_proc_info(pid);
+
+        let (cwd, cwd_verified) = {
+            // Try native API first, then sysinfo, then fallback
+            let native_cwd = native_info.as_ref().and_then(|i| i.cwd.clone());
+            let sysinfo_cwd = proc.cwd().map(|p| p.to_string_lossy().into_owned()).filter(|s| !s.is_empty());
+
+            if let Some(d) = native_cwd {
+                (d, true)
+            } else if let Some(d) = sysinfo_cwd {
+                (d, true)
+            } else if let Some(fb) = fallback_cwd.filter(|s| !s.is_empty()) {
+                (fb.to_string(), false)
+            } else {
+                let parent = PathBuf::from(&exe_path)
+                    .parent()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                if parent.is_empty() {
+                    return Err(AppError::message(
+                        "PEER_RESOLVE",
+                        format!("could not determine working directory for pid {pid}"),
+                    ));
                 }
+                (parent, false)
             }
         };
 
-        let run_args: String = proc.cmd().iter().map(|s| s.to_string_lossy()).collect::<Vec<_>>().join(" ");
+        let run_args = {
+            // Try native API first, then sysinfo
+            let native_cmd = native_info.as_ref().map(|i| i.cmd_line.clone()).filter(|s| !s.is_empty());
+            let sysinfo_cmd: String = proc.cmd().iter().map(|s| s.to_string_lossy()).collect::<Vec<_>>().join(" ");
+
+            native_cmd.unwrap_or(sysinfo_cmd)
+        };
 
         let process_name = PathBuf::from(&exe_path)
             .file_name()
@@ -83,7 +98,8 @@ impl VerifiedClient {
         let mid = machine_id::read_machine_id();
         let git_remote = read_git_remote(&cwd);
 
-        let fingerprint = compute_fingerprint(&mid, git_remote.as_deref(), &cwd, &exe_path, &uid);
+        let fingerprint = compute_fingerprint(&mid, git_remote.as_deref(), &cwd, &exe_path, &uid, &run_args);
+
 
         Ok(Self {
             pid,
@@ -106,6 +122,7 @@ fn compute_fingerprint(
     cwd: &str,
     exe_path: &str,
     uid: &str,
+    run_args: &str,
 ) -> String {
     let mut hasher = Sha256::new();
     hasher.update(machine_id.as_bytes());
@@ -117,6 +134,8 @@ fn compute_fingerprint(
     hasher.update(exe_path.replace('\\', "/").to_lowercase().as_bytes());
     hasher.update(b"|");
     hasher.update(uid.as_bytes());
+    hasher.update(b"|");
+    hasher.update(run_args.replace('\\', "/").to_lowercase().as_bytes());
     hex::encode(hasher.finalize())
 }
 

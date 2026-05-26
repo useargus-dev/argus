@@ -6,6 +6,7 @@
 //! never trusted for identity.
 
 pub mod machine_id;
+mod proc_info;
 mod resolve;
 
 #[cfg(unix)]

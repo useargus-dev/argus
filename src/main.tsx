@@ -7,6 +7,8 @@ import { initTheme } from "./lib/theme";
 
 initTheme();
 
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <App />

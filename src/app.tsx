@@ -12,6 +12,7 @@ import { RegisterProvisioningPage } from "./pages/register-provisioning";
 import { BucketDetailPage } from "./pages/bucket-detail";
 import { BucketsPage } from "./pages/buckets";
 import { SettingsPage } from "./pages/settings";
+import { ApprovalsPage } from "./pages/approvals";
 import { RequestsPage } from "./pages/requests";
 import { VaultPage } from "./pages/vault";
 import { useAuthStore } from "./state/auth-store";
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/vault" element={<VaultPage />} />
           <Route path="/buckets" element={<BucketsPage />} />
+          <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/buckets/:id" element={<BucketDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

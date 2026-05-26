@@ -27,7 +27,7 @@ pub fn run() {
                 use tauri::Manager;
 
                 let open_i = MenuItem::with_id(app, "open", "Open Argus", true, None::<&str>)?;
-                let requests_i = MenuItem::with_id(app, "requests", "Access Requests", true, None::<&str>)?;
+                let requests_i = MenuItem::with_id(app, "requests", "Approvals", true, None::<&str>)?;
                 let quit_i = MenuItem::with_id(app, "quit", "Sign out", true, None::<&str>)?;
                 let menu = Menu::with_items(app, &[&open_i, &requests_i, &quit_i])?;
                 let Some(icon) = app.default_window_icon().cloned() else {
@@ -57,7 +57,15 @@ pub fn run() {
                         } = event
                         {
                             let app = tray.app_handle();
-                            if let Some(w) = app.get_webview_window("main") {
+                            let signed_in = app
+                                .state::<AppState>()
+                                .0
+                                .lock()
+                                .map(|i| i.is_signed_in())
+                                .unwrap_or(false);
+                            if signed_in {
+                                show_requests_window(app);
+                            } else if let Some(w) = app.get_webview_window("main") {
                                 let _ = w.show();
                                 let _ = w.set_focus();
                             }
@@ -111,9 +119,13 @@ pub fn run() {
             commands::buckets::delete_bucket_mapping,
             commands::settings::get_settings,
             commands::settings::set_setting,
+            commands::clients::is_signed_in,
+            commands::clients::show_main_window,
             commands::clients::list_pending_client_access,
             commands::clients::respond_to_client_access,
             commands::clients::pending_client_access_count,
+            commands::clients::list_grants,
+            commands::clients::revoke_grant,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -148,17 +160,31 @@ fn show_requests_window(app: &tauri::AppHandle) {
         let _ = w.show();
         let _ = w.set_focus();
     } else {
-        let _ = tauri::WebviewWindowBuilder::new(
+        let width = 400.0_f64;
+        let height = 480.0_f64;
+        let margin = 16.0_f64;
+
+        let mut builder = tauri::WebviewWindowBuilder::new(
             app,
             "requests",
             tauri::WebviewUrl::App("/requests".into()),
         )
-        .title("Argus — Access Requests")
-        .inner_size(420.0, 500.0)
+        .title("Argus — Approvals")
+        .inner_size(width, height)
         .min_inner_size(360.0, 300.0)
         .resizable(true)
-        .always_on_top(true)
-        .center()
-        .build();
+        .always_on_top(true);
+
+        if let Some(monitor) = app.primary_monitor().ok().flatten() {
+            let screen = monitor.size();
+            let scale = monitor.scale_factor();
+            let screen_w = screen.width as f64 / scale;
+            let screen_h = screen.height as f64 / scale;
+            let x = screen_w - width - margin;
+            let y = screen_h - height - margin - 48.0;
+            builder = builder.position(x, y);
+        }
+
+        let _ = builder.build();
     }
 }

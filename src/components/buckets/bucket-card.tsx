@@ -55,6 +55,24 @@ export function BucketCard({
               bucket.isActive ? "Deactivate bucket" : "Activate bucket"
             }
           />
+          <button
+            type="button"
+            aria-label="Delete bucket"
+            title="Delete"
+            onClick={onDelete}
+            className="grid size-8 place-items-center rounded-md text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </button>
+          <Link
+            to={`/buckets/${bucket.id}`}
+            aria-label="Open bucket"
+            title="Open bucket"
+            className="inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+          >
+            Open
+            <ArrowUpRight className="size-4" aria-hidden />
+          </Link>
         </div>
       </div>
 
@@ -76,27 +94,6 @@ export function BucketCard({
         cachedToken={cachedToken}
         onTokenCached={onTokenCached}
       />
-
-      <div className="mt-4 flex items-center justify-end gap-1">
-        <button
-          type="button"
-          aria-label="Delete bucket"
-          title="Delete"
-          onClick={onDelete}
-          className="grid size-8 place-items-center rounded-md text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
-        >
-          <Trash2 className="size-4" aria-hidden />
-        </button>
-        <Link
-          to={`/buckets/${bucket.id}`}
-          aria-label="Open bucket"
-          title="Open bucket"
-          className="inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
-        >
-          Open
-          <ArrowUpRight className="size-4" aria-hidden />
-        </Link>
-      </div>
     </article>
   );
 }

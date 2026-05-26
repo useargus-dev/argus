@@ -3,7 +3,7 @@
 > **Argus** is a local-first secrets vault and approval gateway for developer environments.  
 > One encrypted database. One OS user. Zero cloud. Secrets leave the machine only when a human approves a specific process identity.
 
-> **Implementation note:** **IPC** (local socket/pipe + grants + approval UI) and **tray hide-on-close** are **shipped** on desktop. **Python/Node client libraries** and advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
+> **Implementation note:** **IPC** (local socket/pipe + OS-verified fingerprint + grants + requests popup window + approvals page) and **tray** (hide-on-close, left-click opens requests) are **shipped** on desktop. **Python/Node client libraries** and advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
 
 **Related documents:** [plan.md](./plan.md) · [design.md](./design.md) · [security.md](./security.md)
 
@@ -52,7 +52,7 @@ Argus replaces plaintext `.env` files in projects with:
 **Core guarantees (when signed in):**
 
 - **Argus core** may run in the **system tray** with the main window closed; active buckets stay visible and IPC stays up.
-- External apps connect via **local IPC** with `bucket_id` + `client_token` + `uri` (future Python/Node libraries).
+- External apps connect via **local IPC** with `bucket_id` + `client_token`. Client identity is derived server-side via OS process inspection and hashed into a **fingerprint**.
 - **New clients** always trigger a user approval popup; returning clients use **per-bucket TTL / refresh** policy.
 - **Three authorization scopes** gate the UI shell, vault CRUD, and bucket CRUD (see §12).
 - Injectable secret types are enforced in **Rust**, not the UI.
@@ -120,11 +120,11 @@ References: [Tauri Security Model](https://v2.tauri.app/security/), [Isolation P
 │  │  pages/                      │    │  commands/  ← Tauri invoke API    │ │
 │  │  components/                 │◄──►│  db/        ← SQLCipher + repos    │ │
 │  │  state/ (Zustand)            │    │  crypto/    ← KDF, AES-GCM, TOTP   │ │
-│  │  hooks/                      │    │  socket/    ← IPC server            │ │
+│  │  hooks/                      │    │  ipc/       ← IPC server + peer     │ │
 │  │  lib/tauri-bridge.ts         │    │  sessions/  ← pending approvals     │ │
 │  │                              │    │  background/← timers, lock watcher  │ │
 │  └─────────────────────────────┘    └──────────────────────────────────┘ │
-│              │ events: approval-requested, locked, expiry-alert          │
+│              │ events: client-access-requested, locked, expiry-alert     │
 │              │ invoke: unlock, secrets.*, buckets.*, ...                   │
 └──────────────────────────────┬───────────────────────────────────────────┘
                                │
@@ -139,7 +139,7 @@ References: [Tauri Security Model](https://v2.tauri.app/security/), [Isolation P
 
 | Layer | Responsibility |
 |---|---|
-| **Presentation** | UX, forms, search UI, approval modal, masked display |
+| **Presentation** | UX, forms, search UI, requests popup, approvals page, masked display |
 | **Tauri bridge** | Typed wrappers over `invoke`, event subscriptions |
 | **Commands** | Authorize UI actions, decrypt for display, CRUD |
 | **Domain services** | Business rules: access matrix, approval TTL, audit writes |
@@ -192,8 +192,8 @@ User chooses **TOTP or biometric** at setup — **not optional** to skip both.
 ```
 sign_out() or soft app lock invoked or auto-lock fires
         │
-        ├──► (planned) socket server shutdown + unlink socket file
-        ├──► (planned) cancel background IPC tasks
+        ├──► sign_out: socket server shutdown + unlink socket file
+        ├──► sign_out: cancel background IPC tasks
         ├──► sign_out: zeroize keys + clear session; soft lock: app_locked only
         ├──► sign_out: close DB pool (SQLCipher page cache cleared)
         └──► emit "signed-out" or "app-locked" → frontend updates auth store
@@ -210,13 +210,13 @@ sign_out() or soft app lock invoked or auto-lock fires
 | File / path | Platform | Permissions | Lifecycle |
 |---|---|---|---|
 | `argus.db` | All | `0600` (user read/write) | Created first run |
-| `argus.sock` | macOS, Linux | `0600` after bind | **(planned)** Created on unlock, removed on lock |
-| `\\.\pipe\argus` | Windows | DACL: current user only | **(planned)** Same lifecycle |
+| `argus.sock` | macOS, Linux | `0600` after bind | Created on sign-in, removed on sign-out |
+| `\\.\pipe\argus` | Windows | DACL: current user only | Same lifecycle |
 | `logs/` (optional) | All | `0700` dir | Debug builds only; no secrets |
 
 Use `dirs` crate → `data_local_dir()` / equivalent, then `~/.argus` (documented, not hardcoded to `$HOME` on Windows).
 
-### 6.2 IPC transport matrix **(planned — not implemented in v0.1)**
+### 6.2 IPC transport matrix **(shipped)**
 
 | Platform | Mechanism | Path / name | Security notes |
 |---|---|---|---|
@@ -234,7 +234,7 @@ Use `dirs` crate → `data_local_dir()` / equivalent, then `~/.argus` (documente
 |---|---|---|---|
 | Screen lock detection | `NSWorkspace` | `WTS_SESSION_LOCK` | DBus `ScreenSaver` |
 | Notifications | `tauri-plugin-notification` | Same | Same (freedesktop) |
-| Process identity | `sysinfo` → exe path + cwd | Same | Same |
+| Process identity | Native OS APIs + `sysinfo` fallback → fingerprint | Same | Same |
 | Clipboard clear | WebView + Rust timer | Same | Same |
 | Code signing (Phase 4) | Notarization | Authenticode | AppImage + GPG |
 
@@ -272,13 +272,19 @@ src-tauri/src/
 │   ├── value_enc.rs        # AES-256-GCM for secrets.value blob
 │   └── totp.rs             # RFC 6238 verify/generate
 │
-├── socket/
-│   ├── mod.rs              # Listener start/stop (cfg unix / windows)
-│   ├── handler.rs          # Per-connection state machine
-│   ├── protocol.rs         # serde Request / Response types
-│   └── process_info.rs     # PID → path, cwd (sysinfo)
+├── ipc/
+│   ├── mod.rs              # Public API
+│   ├── server.rs           # Listener start/stop (cfg unix / windows)
+│   ├── handler.rs          # Per-connection state machine + grant logic
+│   ├── protocol.rs         # serde IpcRequest / IpcResponse types
+│   └── peer/
+│       ├── mod.rs          # from_connected_stream (unix/windows)
+│       ├── resolve.rs      # PID → VerifiedClient + fingerprint
+│       ├── machine_id.rs   # OS-specific stable machine identifier
+│       └── proc_info.rs    # Native process inspection (cmdline, cwd)
 │
 ├── sessions/
+│   ├── pending.rs          # ClientAccessRequestEvent queue (15-min window)
 │   └── store.rs            # request_id → oneshot::Sender<ApprovalDecision>
 │
 ├── background/
@@ -292,7 +298,7 @@ src-tauri/src/
     ├── auth.rs
     ├── secrets.rs
     ├── buckets.rs
-    ├── approvals.rs
+    ├── clients.rs          # IPC grant management + requests window commands
     ├── audit.rs
     └── settings.rs
 ```
@@ -308,7 +314,7 @@ src-tauri/src/
 | HKDF | `hkdf` + `sha2` | `value_key` from `db_key` |
 | Secrets in RAM | `secrecy` + `zeroize` | Wrap keys and decrypted values |
 | TOTP | `totp-rs` | SHA-1, 6 digits, ±1 window |
-| Process info | `sysinfo` | Exe path + cwd |
+| Process info | `sysinfo` + native OS APIs | Exe path, cwd, cmdline, UID + fingerprint |
 | UUID | `uuid` v4 | All PKs |
 | Serialize | `serde`, `serde_json` | Value blobs + IPC |
 | Notifications | `tauri-plugin-notification` | Approval prompts |
@@ -346,26 +352,26 @@ Managed via `tauri::Manager::manage()` — **single instance** per app process.
 ### 7.5 Socket handler flow
 
 ```
-accept connection
+accept connection (pipe/socket)
     │
     ▼
-read line → parse SocketRequest
+read line → parse IpcRequest (bucket_id, client_token, optional cwd)
     │
     ▼
-validate bucket_id exists
+resolve peer from OS (PID → exe, cwd, uid, args, machine_id, git_remote → fingerprint)
     │
     ▼
-resolve process (trust but verify path from client vs sysinfo optional cross-check)
+validate bucket_id exists + token hash matches
     │
     ▼
-query approvals (bucket_id, process_path, working_dir) WHERE expires_at > now()
+query client_grants (bucket_id, fingerprint, token_hash) WHERE expires_at > now()
     │
     ├─ HIT ──► load mappings → decrypt injectable secrets → write audit → respond ok
     │
     └─ MISS ──► insert pending in sessions/store
-              → emit approval-requested + OS notification
+              → emit client-access-requested + show requests window
               → wait oneshot (timeout 120s)
-                    ├─ approved → INSERT approval, audit APPROVED, respond ok
+                    ├─ approved → INSERT grant, audit GRANTED, respond ok
                     └─ denied  → audit DENIED, respond denied
 ```
 
@@ -394,6 +400,8 @@ src/
 │   ├── dashboard.tsx
 │   ├── vault.tsx
 │   ├── buckets.tsx
+│   ├── approvals.tsx          # Grant management (main window)
+│   ├── requests.tsx           # IPC access requests (tray popup window)
 │   └── settings.tsx
 ├── bones/                      # boneyard-js generated skeletons
 ├── state/
@@ -424,24 +432,23 @@ src/
 
 | Event | Payload | UI action |
 |---|---|---|
-| `approval-requested` | `ApprovalRequest` | Show banner + focus window |
+| `client-access-requested` | `ClientAccessRequestEvent` | Refresh requests list (requests window) |
 | `signed-out` | `{}` | Navigate to `/login`, clear vault + auth stores |
 | `signed-in` | `UserProfile` | Hydrate sidebar profile; load dashboard data |
 | `expiry-alert` | `{ secretId, daysRemaining }` | Update dashboard + vault badges |
-| `approvals-changed` | `{}` | Refresh approvals list |
 
 ### 8.4 Routing
 
-| Route | Guard |
-|---|---|
-| `/` | Redirect → `/login`, `/register`, or `/dashboard` |
-| `/register` | Only if no `users` row |
-| `/login` | When signed out |
-| `/dashboard`, `/vault`, `/buckets`, `/settings` | Requires sign-in |
+| Route | Guard | Window |
+|---|---|---|
+| `/` | Redirect → `/login`, `/register`, or `/dashboard` | Main |
+| `/register` | Only if no `users` row | Main |
+| `/login` | When signed out | Main |
+| `/dashboard`, `/vault`, `/buckets`, `/settings` | Requires sign-in + app unlocked | Main |
+| `/approvals` | Requires sign-in + app unlocked | Main |
+| `/requests` | Requires sign-in (works while app locked) | Requests popup |
 
-**No dedicated UI routes** for `/expiring`, `/audit`, or `/approvals` — see [design.md](./design.md).
-
-Use **React Router** (add in Milestone 2) or lightweight state machine in `app.tsx` for MVP.
+The `/requests` route renders in a separate compact window opened from the system tray. It shows pending access requests from the last 15 minutes and allows the user to accept/deny them even when the main app is locked. The `/approvals` route is in the main app sidebar and lists all active/expired grants with a revoke option.
 
 ---
 
@@ -519,32 +526,26 @@ Full threat analysis: [security.md](./security.md).
 
 Socket server runs while the user is **signed in** (starts on sign-in, stops on sign-out). The main window may be hidden; IPC stays up when **Run in background** is enabled.
 
-### 11.1 Request (client → Argus) — v2 protocol
+### 11.1 Request (client → Argus) — v3 protocol
 
-Used by future Python/Node libraries (not in current implementation scope). Legacy fields (`process_path`, `working_dir`, `pid`) remain for CLI/debug.
+Client identity is **never** trusted from JSON. The server derives PID, exe, cwd, uid, git remote, and machine ID from OS APIs. The client only sends credentials:
 
 ```json
 {
   "request_id": "uuid-v4",
   "bucket_id": "550e8400-e29b-41d4-a716-446655440000",
   "client_token": "<ARGUS_BUCKET_TOKEN value>",
-  "uri": "file:///Users/dev/projects/acme-backend",
-  "process_name": "python",
-  "process_path": "/usr/bin/python3",
-  "working_dir": "/Users/dev/projects/acme-backend",
-  "pid": 4521
+  "cwd": "/Users/dev/projects/acme-backend"
 }
 ```
 
 | Field | Required | Purpose |
 |---|---|---|
 | `bucket_id` | Yes | App bucket / “app id” (`ARGUS_BUCKET_ID` in project) |
-| `client_token` | Yes | Secret issued in bucket settings or after first approval |
-| `uri` | No (optional) | If sent, must match OS-verified URI or request fails with `URI_MISMATCH` |
-| Grant URI | Server | Canonical `file://` from **peer process cwd** at connect time |
-| `process_*`, `pid` | Server | Resolved via pipe/socket peer PID + `sysinfo` (shown in approval UI) |
+| `client_token` | Yes | Secret issued in bucket settings |
+| `cwd` | No | Fallback working directory (Windows only, when OS can't read peer cwd) |
 
-**`uri` normalization (Rust):** lowercase scheme, resolve `.` segments, canonical path — hash stored as `uri_hash` for grant lookup.
+All other identity fields (exe path, process name, PID, UID, machine ID, git remote, command-line args) are resolved **server-side** from the peer process attached to the pipe/socket. See [security.md](./security.md) §9.1 for the fingerprint computation.
 
 ### 11.2 Grant check flow
 
@@ -555,13 +556,13 @@ IPC request received (core signed in, socket up)
 Validate bucket_id exists and bucket is "active" (tray / user toggle)
         │
         ▼
-Lookup client_grants WHERE bucket_id + uri_hash + token_hash
+Lookup client_grants WHERE bucket_id + fingerprint + token_hash
         AND expires_at > now()
         │
         ├─ HIT ──► return secrets per mappings; audit SECRET_ACCESSED
         │
         └─ MISS / expired ──► emit client-access-requested
-                              OS notification + tray popup
+                              Show requests window (bottom-right popup)
                               User Accept → INSERT grant
                                 expires_at = now + bucket.access_ttl_minutes
                                 (or global default)
@@ -583,7 +584,7 @@ Lookup client_grants WHERE bucket_id + uri_hash + token_hash
 ### 11.4 Connection policy
 
 - Short-lived connection per request (or keep-alive v2 — default: one shot).
-- Rate limit per `bucket_id` + `uri_hash`.
+- Rate limit per `bucket_id` + `fingerprint`.
 - Max message 64 KiB.
 
 ---
@@ -625,32 +626,35 @@ elevate_buckets() → legacy no-op when app unlocked; buckets follow APP
 
 ### 13.1 Process model
 
-**Shipped today:** system tray icon (Open / Sign out), main window **hide** on close (not quit). **Planned:** socket server, client-access popups, and honoring `run_in_background` when deciding close behavior.
+**Shipped:** system tray icon, IPC socket server, access requests popup window, `run_in_background` setting.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ Argus (Tauri + Rust) — when signed in                    │
 │  • SQLCipher pool (shipped)                              │
 │  • Tray icon + menu (shipped)                            │
-│  • Socket server (planned)                               │
-│  • Approval / client-access popup (planned)              │
+│  • Socket server (shipped)                               │
+│  • Access requests popup window (shipped)                │
 ├─────────────────────────────────────────────────────────┤
 │ Main Window (React) — user can hide via window close     │
-│  • Dashboard, vault, buckets, settings (shipped)       │
+│  • Dashboard, vault, buckets, approvals, settings      │
+├─────────────────────────────────────────────────────────┤
+│ Requests Window (React) — compact bottom-right popup     │
+│  • Pending access requests (last 15 min)                │
+│  • Accept / Deny with TTL selection                     │
 └─────────────────────────────────────────────────────────┘
 ```
 
-Closing the **main window** currently **hides** it (tray remains). Setting `run_in_background` is stored but does not yet change that behavior. **Sign out** clears session keys and returns to login.
+Closing the **main window** hides it (tray remains) when `run_in_background` is enabled. **Sign out** clears session keys and returns to login.
 
-### 13.2 Tray menu
+### 13.2 Tray behavior
 
-**Shipped:** Open Argus, Sign out.
-
-**Planned:** per-bucket submenu, pending client badges, Pause all IPC.
+**Left-click:** If signed in → open **Requests window** (bottom-right popup showing pending access requests). If not signed in → open **Main window** for sign-in.
 
 | Menu item | Status | Action |
 |---|---|---|
 | Open Argus | Shipped | Show/focus main window |
+| Access Requests | Shipped | Show requests popup (pending access requests) |
 | Sign out | Shipped | Full sign-out |
 | Active buckets submenu | Planned | Open bucket detail |
 | Pause all IPC | Planned | Emergency deny new grants |
@@ -680,18 +684,17 @@ Closing the **main window** currently **hides** it (tray remains). Setting `run_
 CREATE TABLE client_grants (
   id              TEXT PRIMARY KEY,
   bucket_id       TEXT NOT NULL REFERENCES app_buckets(id) ON DELETE CASCADE,
-  uri_hash        TEXT NOT NULL,           -- SHA-256 of normalized uri
-  uri_display     TEXT NOT NULL,           -- for UI
+  fingerprint     TEXT NOT NULL,           -- SHA-256 of (machine_id|git_remote|cwd|exe_path|uid|run_args)
   token_hash      TEXT NOT NULL,           -- SHA-256 of client_token
   client_label    TEXT,                    -- optional friendly name
   granted_at      TEXT NOT NULL,
   expires_at      TEXT NOT NULL,
   last_seen_at    TEXT,
-  UNIQUE(bucket_id, uri_hash, token_hash)
+  UNIQUE(bucket_id, fingerprint, token_hash)
 );
 ```
 
-Legacy `approvals` (process_path + working_dir) may coexist for CLI until migrated — see [plan.md](./plan.md).
+Grant identity is `(bucket_id, fingerprint, token_hash)`. Fingerprint is computed from OS-verified peer attributes — see [security.md](./security.md) §9.1.
 
 ### Per-bucket access settings (`app_buckets` columns)
 
@@ -710,15 +713,20 @@ Legacy `approvals` (process_path + working_dir) may coexist for CLI until migrat
 | `run_in_background` | `1` | Close window → tray, keep IPC |
 | `auto_lock_minutes` | `30` | Idle app lock (vault and buckets follow app) |
 
-### Client access popup (new app)
+### Client access popup (requests window)
 
-Triggered on `client-access-requested` event:
+When a new IPC request arrives and no active grant matches, the **requests window** (bottom-right popup) opens automatically. All pending requests from the last 15 minutes are shown in a scrollable list. Each request card displays:
 
-| Surface | Content |
+| Field | Content |
 |---|---|
-| OS notification | “New app wants access to {bucket}” |
-| Tray / modal | URI, token fingerprint (last 4 chars), process name, Accept / Deny |
-| Accept options | Use bucket TTL or pick 15m / 1h / 3h / 8h (override once) |
+| Bucket name | Which bucket the client wants to access |
+| Folder (cwd) | Full working directory path (with unverified badge if OS fallback) |
+| Exe path | Full path to the connecting executable |
+| Git remote | Repository URL (if detected) |
+| Args | Process command line (tokens stripped from display) |
+| Accept options | Use bucket TTL or pick 15m / 1h / 3h / 8h |
+
+The requests window works **even when the app is locked** (only requires signed-in status). If the user is not signed in, the window shows a sign-in prompt instead.
 
 ### Audit events (append-only)
 
@@ -734,7 +742,7 @@ Triggered on `client-access-requested` event:
 | **2 — CLI** | Shell | Same socket; `argus` binary path | Above + `ssh_key`, `certificate` (with confirm) |
 | **3 — UI** | Human | Tauri `invoke` | All types; copy-only for `credential` |
 
-Access matrix enforced in `socket/handler.rs` and `commands/secrets.rs`.
+Access matrix enforced in `ipc/handler.rs` and `commands/secrets.rs`.
 
 ---
 
@@ -756,11 +764,11 @@ argus/
 ### Library contract (future Python/Node — not v1 UI scope)
 
 1. Read `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` from `.env` (or env).
-2. Compute canonical `uri` (project root path or registered URI).
-3. Connect to `~/.argus/argus.sock` / `\\.\pipe\argus`.
-4. Send v2 request JSON (§11.1).
-5. Handle `ok` / `pending` / `denied` / `locked`.
-6. On first run, user approves in popup; grant TTL from bucket settings.
+2. Connect to `~/.argus/argus.sock` / `\\.\pipe\argus`.
+3. Send v3 request JSON (§11.1) — only `bucket_id`, `client_token`, optional `cwd`.
+4. Handle `ok` / `pending` / `denied` / `locked`.
+5. On first run, user approves in requests popup; grant TTL from bucket settings.
+6. Server derives client fingerprint from OS process inspection (no client-side identity).
 
 ### CLI commands (Phase 3)
 

@@ -4,7 +4,7 @@ Public technical docs for the Argus desktop app. Start with the [root README](..
 
 | Document | Purpose |
 |----------|---------|
-| [architecture.md](./architecture.md) | System design: auth, vault, buckets, IPC (planned), SQLCipher, file layout |
+| [architecture.md](./architecture.md) | System design: auth, vault, buckets, IPC, fingerprint, tray, SQLCipher, file layout |
 | [security.md](./security.md) | Threat model, cryptography, hardening checklist |
 | [build-deps.md](./build-deps.md) | SQLCipher / OpenSSL setup (Windows, macOS, Linux) |
 | [design.md](./design.md) | UI screens, components, user flows |
@@ -24,5 +24,6 @@ Older docs may mention separate “elevate vault/buckets” steps; that was simp
 ## Before you ship or fork
 
 - Read [security.md](./security.md) § Known limitations.
-- **IPC** (socket/pipe, grants, approval dialog) and **tray** (hide-on-close) are **shipped**. **Client libraries** are **planned** — see [architecture.md](./architecture.md) §11 and `pnpm ipc:test` (`scripts/ipc-request.ts`).
+- **IPC** (socket/pipe, advanced fingerprint, grants, requests popup window) and **tray** (hide-on-close, left-click opens requests) are **shipped**. **Client libraries** are **planned** — see [architecture.md](./architecture.md) §11 and `pnpm ipc:test` (`scripts/ipc-request.ts`).
+- **Approvals page** in main app sidebar — view and revoke all client grants.
 - **Licensing:** community code is [AGPL-3.0](../LICENSE); proprietary/self-hosted offerings use [COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md).

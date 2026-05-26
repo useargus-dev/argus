@@ -87,6 +87,63 @@ pub fn insert_grant(
     Ok(grant_id)
 }
 
+/// A grant row for the UI approvals list.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrantRow {
+    pub id: String,
+    pub bucket_id: String,
+    pub bucket_name: String,
+    pub fingerprint: String,
+    pub client_label: Option<String>,
+    pub granted_at: String,
+    pub expires_at: String,
+    pub last_seen_at: Option<String>,
+    pub is_active: bool,
+}
+
+pub fn list_grants(conn: &Connection) -> AppResult<Vec<GrantRow>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT g.id, g.bucket_id, COALESCE(b.name, '(deleted)'), g.fingerprint,
+                    g.client_label, g.granted_at, g.expires_at, g.last_seen_at
+             FROM client_grants g
+             LEFT JOIN app_buckets b ON b.id = g.bucket_id
+             ORDER BY g.granted_at DESC",
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let expires_at: String = row.get(6)?;
+            let is_active = expires_at.as_str() > Utc::now().to_rfc3339().as_str();
+            Ok(GrantRow {
+                id: row.get(0)?,
+                bucket_id: row.get(1)?,
+                bucket_name: row.get(2)?,
+                fingerprint: row.get(3)?,
+                client_label: row.get(4)?,
+                granted_at: row.get(5)?,
+                expires_at,
+                last_seen_at: row.get(7)?,
+                is_active,
+            })
+        })
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row.map_err(|e| AppError::message("DB_ERROR", e.to_string()))?);
+    }
+    Ok(result)
+}
+
+pub fn revoke_grant(conn: &Connection, grant_id: &str) -> AppResult<()> {
+    conn.execute("DELETE FROM client_grants WHERE id = ?1", params![grant_id])
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
 pub fn access_ttl_minutes(conn: &Connection, bucket_access_ttl: i64) -> AppResult<i64> {
     if bucket_access_ttl > 0 {
         return Ok(bucket_access_ttl);

@@ -11,8 +11,10 @@
 - **Vault** — typed secrets, tags, filters, expiry
 - **App buckets** — map env names to vault secrets; per-bucket client tokens
 - **Settings** — security, notifications, tray preference (close hides to tray when signed in)
-- **Local IPC** — apps request bucket env vars via `\\.\pipe\argus` (Windows) or `~/.argus/argus.sock` (macOS/Linux); first connect shows an approval dialog; grants stored with TTL
-- **System tray** — hide on close, Open / Sign out; IPC server runs while signed in
+- **Local IPC** — apps request bucket env vars via `\\.\pipe\argus` (Windows) or `~/.argus/argus.sock` (macOS/Linux); client identity derived server-side via OS process inspection + SHA-256 fingerprint; grants stored with per-bucket TTL
+- **Requests window** — compact bottom-right popup from system tray showing all pending access requests (last 15 min) with Accept/Deny per request; works even while app is locked
+- **Approvals page** — view and revoke all active/expired client grants from the main app sidebar
+- **System tray** — left-click opens requests window (if signed in); hide on close; IPC server runs while signed in
 
 **Planned:** packaged client libraries wrapping IPC. Test with `pnpm ipc:test`. See [docs/architecture.md](docs/architecture.md) §11.
 
