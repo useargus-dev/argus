@@ -5,6 +5,7 @@ import { toast } from "../lib/toast";
 import { useTauriEvent } from "../hooks/use-tauri-event";
 import type { ClientAccessRequest, GrantRow } from "../types/client";
 import { Button } from "../components/ui/button";
+import { Info, X } from "lucide-react";
 
 const TTL_OPTIONS = [15, 60, 180, 480] as const;
 
@@ -282,39 +283,140 @@ function GrantCard({
   grant: GrantRow;
   onRevoke: (id: string) => void;
 }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const displayArgs = grant.runArgs ? stripSensitiveArgs(grant.runArgs) : "";
+
   return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4">
-      <div className="min-w-0 flex-1">
+    <>
+      <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block size-2 rounded-full ${grant.isActive ? "bg-green-500" : "bg-neutral-400"}`}
+            />
+            <span className="text-sm font-medium text-text">
+              {grant.bucketName}
+            </span>
+            {grant.clientLabel && (
+              <span className="truncate text-xs text-text-muted">
+                — {grant.clientLabel}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-text-muted">
+            <span>Granted {timeAgo(grant.grantedAt)}</span>
+            {grant.isActive && (
+              <span className="text-green-600">
+                Expires in {expiresIn(grant.expiresAt)}
+              </span>
+            )}
+            {!grant.isActive && <span>Expired</span>}
+            {grant.lastSeenAt && <span>Last used {timeAgo(grant.lastSeenAt)}</span>}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
-          <span
-            className={`inline-block size-2 rounded-full ${grant.isActive ? "bg-green-500" : "bg-neutral-400"}`}
-          />
-          <span className="text-sm font-medium text-text">
-            {grant.bucketName}
-          </span>
-          {grant.clientLabel && (
-            <span className="truncate text-xs text-text-muted">
-              — {grant.clientLabel}
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowDetails(true)}
+            className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-text-muted hover:bg-surface-raised hover:text-text"
+          >
+            <Info size={13} />
+            Details
+          </button>
+          <Button variant="danger" size="sm" onClick={() => onRevoke(grant.id)}>
+            Revoke
+          </Button>
         </div>
-        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-text-muted">
-          <span>Granted {timeAgo(grant.grantedAt)}</span>
-          {grant.isActive && (
-            <span className="text-green-600">
-              Expires in {expiresIn(grant.expiresAt)}
-            </span>
-          )}
-          {!grant.isActive && <span>Expired</span>}
-          {grant.lastSeenAt && <span>Last used {timeAgo(grant.lastSeenAt)}</span>}
-        </div>
-        <p className="mt-1 truncate font-mono text-[10px] text-text-muted">
-          {grant.fingerprint.slice(0, 16)}…
-        </p>
       </div>
-      <Button variant="danger" size="sm" onClick={() => onRevoke(grant.id)}>
-        Revoke
-      </Button>
+
+      {showDetails && (
+        <GrantDetailsModal grant={grant} displayArgs={displayArgs} onClose={() => setShowDetails(false)} />
+      )}
+    </>
+  );
+}
+
+function GrantDetailsModal({
+  grant,
+  displayArgs,
+  onClose,
+}: {
+  grant: GrantRow;
+  displayArgs: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-text">Grant Details</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-text-muted hover:bg-surface-raised hover:text-text"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <dl className="mt-4 space-y-3 text-xs">
+          {grant.cwd && (
+            <div>
+              <dt className="font-medium text-text-muted">Folder</dt>
+              <dd className="mt-0.5 break-all font-mono text-text">{grant.cwd}</dd>
+            </div>
+          )}
+          {grant.exePath && (
+            <div>
+              <dt className="font-medium text-text-muted">Executable</dt>
+              <dd className="mt-0.5 break-all font-mono text-text">{grant.exePath}</dd>
+            </div>
+          )}
+          {grant.gitRemote && (
+            <div>
+              <dt className="font-medium text-text-muted">Git Remote</dt>
+              <dd className="mt-0.5 break-all font-mono text-text">{grant.gitRemote}</dd>
+            </div>
+          )}
+          {displayArgs && (
+            <div>
+              <dt className="font-medium text-text-muted">Arguments</dt>
+              <dd className="mt-0.5 break-all font-mono text-text">{displayArgs}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="font-medium text-text-muted">Granted At</dt>
+            <dd className="mt-0.5 text-text">{new Date(grant.grantedAt).toLocaleString()}</dd>
+          </div>
+          <div>
+            <dt className="font-medium text-text-muted">Expires At</dt>
+            <dd className="mt-0.5 text-text">{new Date(grant.expiresAt).toLocaleString()}</dd>
+          </div>
+          {grant.lastSeenAt && (
+            <div>
+              <dt className="font-medium text-text-muted">Last Used</dt>
+              <dd className="mt-0.5 text-text">{new Date(grant.lastSeenAt).toLocaleString()}</dd>
+            </div>
+          )}
+          {!grant.cwd && !grant.exePath && !grant.gitRemote && !displayArgs && (
+            <div>
+              <dd className="text-text-muted">
+                No process details available for this grant (granted before details tracking was added).
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="mt-5 flex justify-end">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

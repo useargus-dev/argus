@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Eclipse, KeyRound, LayoutDashboard, Package, Settings, ShieldCheck } from "lucide-react";
+import { BrickWallShield, KeyRound, LayoutDashboard, Package, Settings, ShieldCheck } from "lucide-react";
 
 import { cn } from "../../lib/cn";
 import { useAuthStore } from "../../state/auth-store";
@@ -26,7 +26,7 @@ export function Sidebar() {
   return (
     <aside className="z-10 flex h-dvh w-60 shrink-0 flex-col overflow-hidden border-r border-border bg-surface">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-4">
-        <Eclipse className="text-signal" size={22} />
+        <BrickWallShield size={22} className="text-signal" />
         <span className="font-semibold text-text">Argus</span>
       </div>
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden p-3">

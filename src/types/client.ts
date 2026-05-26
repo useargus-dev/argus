@@ -25,4 +25,8 @@ export interface GrantRow {
   expiresAt: string;
   lastSeenAt?: string | null;
   isActive: boolean;
+  cwd?: string | null;
+  exePath?: string | null;
+  gitRemote?: string | null;
+  runArgs?: string | null;
 }

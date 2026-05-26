@@ -142,6 +142,12 @@ async fn process_request(
         }),
         PendingDecision::Accept { ttl_minutes } => {
             let ttl = if ttl_minutes > 0 { ttl_minutes } else { access_ttl };
+            let details = client_grants::GrantDetails {
+                cwd: Some(peer.cwd.clone()),
+                exe_path: Some(peer.exe_path.clone()),
+                git_remote: peer.git_remote.clone(),
+                run_args: Some(peer.run_args.clone()),
+            };
             let env = with_session_db(state, |conn, value_key| {
                 client_grants::insert_grant(
                     conn,
@@ -150,6 +156,7 @@ async fn process_request(
                     &req.client_token,
                     ttl,
                     Some(&peer.process_name),
+                    Some(&details),
                 )?;
                 ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)
             })?;

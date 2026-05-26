@@ -1,4 +1,4 @@
-import { Eclipse } from "lucide-react";
+import { BrickWallShield } from "lucide-react";
 
 export function RegisterBrand() {
   return (
@@ -10,8 +10,9 @@ export function RegisterBrand() {
           borderColor: "var(--brand-border)",
         }}
       >
-        <Eclipse
-          className="size-5"
+        <BrickWallShield
+          size={20}
+          className="text-brand-icon"
           style={{ color: "var(--brand-icon)" }}
           aria-hidden
         />

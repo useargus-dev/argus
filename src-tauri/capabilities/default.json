@@ -18,6 +18,7 @@
     "opener:default",
     "notification:default",
     "clipboard-manager:default",
-    "biometry:default"
+    "biometry:default",
+    "updater:default"
   ]
 }

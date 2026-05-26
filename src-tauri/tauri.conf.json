@@ -32,6 +32,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/useargus/argus/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwODU4NjAzQUMxQjhCOUYKUldTZml4dXNBNGFGRUcrWnRJTGdoSDZVemt6S1pGcUJ5ZUZNMzVKeldhRnEzUnJFdnFhYmpNQTQK"
+    }
   }
 }

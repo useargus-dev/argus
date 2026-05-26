@@ -19,7 +19,7 @@ pub fn find_active_grant(
     let row: Result<String, _> = conn.query_row(
         "SELECT id FROM client_grants
          WHERE bucket_id = ?1 AND fingerprint = ?2 AND token_hash = ?3
-           AND expires_at > datetime('now')",
+           AND datetime(expires_at) > datetime('now')",
         params![bucket_id, fingerprint, token_hash],
         |r| r.get(0),
     );
@@ -39,6 +39,13 @@ pub fn touch_grant(conn: &Connection, grant_id: &str) -> AppResult<()> {
     Ok(())
 }
 
+pub struct GrantDetails {
+    pub cwd: Option<String>,
+    pub exe_path: Option<String>,
+    pub git_remote: Option<String>,
+    pub run_args: Option<String>,
+}
+
 pub fn insert_grant(
     conn: &Connection,
     bucket_id: &str,
@@ -46,6 +53,7 @@ pub fn insert_grant(
     token: &str,
     ttl_minutes: i64,
     client_label: Option<&str>,
+    details: Option<&GrantDetails>,
 ) -> AppResult<String> {
     let token_hash = buckets::hash_token(token);
     let now = Utc::now();
@@ -63,17 +71,26 @@ pub fn insert_grant(
         return Ok(existing.id);
     }
 
+    let (cwd, exe_path, git_remote, run_args) = match details {
+        Some(d) => (d.cwd.as_deref(), d.exe_path.as_deref(), d.git_remote.as_deref(), d.run_args.as_deref()),
+        None => (None, None, None, None),
+    };
+
     let id = Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO client_grants (id, bucket_id, fingerprint, token_hash,
-         client_label, granted_at, expires_at, last_seen_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         client_label, granted_at, expires_at, last_seen_at, cwd, exe_path, git_remote, run_args)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
          ON CONFLICT(bucket_id, fingerprint, token_hash) DO UPDATE SET
            client_label = COALESCE(excluded.client_label, client_label),
            granted_at = excluded.granted_at,
            expires_at = excluded.expires_at,
-           last_seen_at = excluded.last_seen_at",
-        params![id, bucket_id, fingerprint, token_hash, client_label, now_s, exp_s, now_s],
+           last_seen_at = excluded.last_seen_at,
+           cwd = COALESCE(excluded.cwd, cwd),
+           exe_path = COALESCE(excluded.exe_path, exe_path),
+           git_remote = COALESCE(excluded.git_remote, git_remote),
+           run_args = COALESCE(excluded.run_args, run_args)",
+        params![id, bucket_id, fingerprint, token_hash, client_label, now_s, exp_s, now_s, cwd, exe_path, git_remote, run_args],
     )
     .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
 
@@ -100,13 +117,18 @@ pub struct GrantRow {
     pub expires_at: String,
     pub last_seen_at: Option<String>,
     pub is_active: bool,
+    pub cwd: Option<String>,
+    pub exe_path: Option<String>,
+    pub git_remote: Option<String>,
+    pub run_args: Option<String>,
 }
 
 pub fn list_grants(conn: &Connection) -> AppResult<Vec<GrantRow>> {
     let mut stmt = conn
         .prepare(
             "SELECT g.id, g.bucket_id, COALESCE(b.name, '(deleted)'), g.fingerprint,
-                    g.client_label, g.granted_at, g.expires_at, g.last_seen_at
+                    g.client_label, g.granted_at, g.expires_at, g.last_seen_at,
+                    g.cwd, g.exe_path, g.git_remote, g.run_args
              FROM client_grants g
              LEFT JOIN app_buckets b ON b.id = g.bucket_id
              ORDER BY g.granted_at DESC",
@@ -116,7 +138,9 @@ pub fn list_grants(conn: &Connection) -> AppResult<Vec<GrantRow>> {
     let rows = stmt
         .query_map([], |row| {
             let expires_at: String = row.get(6)?;
-            let is_active = expires_at.as_str() > Utc::now().to_rfc3339().as_str();
+            let is_active = chrono::DateTime::parse_from_rfc3339(&expires_at)
+                .map(|exp| exp > Utc::now())
+                .unwrap_or(false);
             Ok(GrantRow {
                 id: row.get(0)?,
                 bucket_id: row.get(1)?,
@@ -127,6 +151,10 @@ pub fn list_grants(conn: &Connection) -> AppResult<Vec<GrantRow>> {
                 expires_at,
                 last_seen_at: row.get(7)?,
                 is_active,
+                cwd: row.get(8)?,
+                exe_path: row.get(9)?,
+                git_remote: row.get(10)?,
+                run_args: row.get(11)?,
             })
         })
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
