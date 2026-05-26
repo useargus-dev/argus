@@ -30,33 +30,33 @@ pnpm install
 pnpm tauri dev
 ```
 
-| Command | Description |
-|---------|-------------|
-| `pnpm tauri dev` | Desktop app with hot reload |
-| `pnpm tauri build` | Release binaries |
-| `pnpm build` | Frontend production build only |
-| `pnpm exec tsc --noEmit` | Typecheck |
+| Command                  | Description                    |
+| ------------------------ | ------------------------------ |
+| `pnpm tauri dev`         | Desktop app with hot reload    |
+| `pnpm tauri build`       | Release binaries               |
+| `pnpm build`             | Frontend production build only |
+| `pnpm exec tsc --noEmit` | Typecheck                      |
 
 ## Data on disk
 
-| Path | Purpose |
-|------|---------|
-| `~/.argus/argus.db` | Encrypted database |
-| `~/.argus/` | App data (see [architecture](docs/architecture.md)) |
-| `~/.argus/argus.sock` | IPC endpoint (Unix; while signed in) |
-| `\\.\pipe\argus` | IPC endpoint (Windows; while signed in) |
+| Path                  | Purpose                                             |
+| --------------------- | --------------------------------------------------- |
+| `~/.argus/argus.db`   | Encrypted database                                  |
+| `~/.argus/`           | App data (see [architecture](docs/architecture.md)) |
+| `~/.argus/argus.sock` | IPC endpoint (Unix; while signed in)                |
+| `\\.\pipe\argus`      | IPC endpoint (Windows; while signed in)             |
 
 Never commit real bucket IDs, tokens, or database files.
 
 ## Documentation
 
-| Document | Audience |
-|----------|----------|
+| Document                                     | Audience                            |
+| -------------------------------------------- | ----------------------------------- |
 | [docs/architecture.md](docs/architecture.md) | System design, modules, data layout |
-| [docs/security.md](docs/security.md) | Threat model, crypto, hardening |
-| [docs/build-deps.md](docs/build-deps.md) | SQLCipher / platform build setup |
-| [docs/design.md](docs/design.md) | UI screens and flows |
-| [docs/plan.md](docs/plan.md) | Development roadmap (aspirational) |
+| [docs/security.md](docs/security.md)         | Threat model, crypto, hardening     |
+| [docs/build-deps.md](docs/build-deps.md)     | SQLCipher / platform build setup    |
+| [docs/design.md](docs/design.md)             | UI screens and flows                |
+| [docs/plan.md](docs/plan.md)                 | Development roadmap (aspirational)  |
 
 ## Security
 
@@ -74,11 +74,11 @@ Argus depends on open-source libraries (React, Tauri, SQLCipher, etc.) under the
 
 **Community edition** (this repository) is free software under the **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0).
 
-| You can (under AGPL) | You need a [commercial license](COMMERCIAL_LICENSE.md) |
-|----------------------|--------------------------------------------------------|
-| Use on your own machine (personal, freelance, or company internal) | Ship a **closed-source** product that includes Argus |
-| View, fork, and modify the source | Offer a **hosted/SaaS** service without AGPL source compliance |
-| Distribute changes **if** you comply with AGPL (source available to users) | Resell a proprietary derivative without open-sourcing it |
+| You can (under AGPL)                                                       | You need a [commercial license](COMMERCIAL_LICENSE.md)         |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Use on your own machine (personal, freelance, or company internal)         | Ship a **closed-source** product that includes Argus           |
+| View, fork, and modify the source                                          | Offer a **hosted/SaaS** service without AGPL source compliance |
+| Distribute changes **if** you comply with AGPL (source available to users) | Resell a proprietary derivative without open-sourcing it       |
 
 A **paid self-hosted / team edition** for startups is planned as a separate product; see [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for inquiries.
 
