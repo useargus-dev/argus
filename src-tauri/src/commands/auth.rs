@@ -36,6 +36,8 @@ pub fn verify_biometric(app: AppHandle) -> Result<(), String> {
 pub struct RegisterValidateRequest {
     pub email: String,
     pub username: String,
+    pub first_name: String,
+    pub last_name: String,
     pub password: String,
     pub second_factor_type: String,
     pub totp_secret: Option<String>,
@@ -96,6 +98,8 @@ fn run_register_validate(
     inner.register_draft = Some(RegisterDraft {
         email: req.email.trim().to_lowercase(),
         username: req.username.trim().to_string(),
+        first_name: req.first_name.trim().to_string(),
+        last_name: req.last_name.trim().to_string(),
         password: req.password,
         password_hash,
         second_factor_type: second_factor,

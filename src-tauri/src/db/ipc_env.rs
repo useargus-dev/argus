@@ -43,15 +43,32 @@ pub fn resolve_bucket_env(
     bucket_id: &str,
     value_key: &[u8; 32],
 ) -> AppResult<HashMap<String, String>> {
-    let mappings = bucket_mappings::list_mappings(conn, bucket_id)?;
+    let mappings = bucket_mappings::list_mappings(conn, bucket_id, value_key)?;
     let mut env = HashMap::new();
     for m in mappings {
-        if !is_socket_injectable(&m.secret_type) {
-            continue;
+        match m.mapping_type.as_str() {
+            "text" => {
+                if let Some(val) = m.text_value {
+                    env.insert(m.env_label, val);
+                }
+            }
+            _ => {
+                let secret_type = match m.secret_type.as_deref() {
+                    Some(t) => t,
+                    None => continue,
+                };
+                if !is_socket_injectable(secret_type) {
+                    continue;
+                }
+                let secret_id = match m.secret_id.as_deref() {
+                    Some(id) => id,
+                    None => continue,
+                };
+                let detail = secrets::get_secret_detail(conn, secret_id, value_key)?;
+                let plain = plain_from_value(&detail.value)?;
+                env.insert(m.env_label, plain);
+            }
         }
-        let detail = secrets::get_secret_detail(conn, &m.secret_id, value_key)?;
-        let plain = plain_from_value(&detail.value)?;
-        env.insert(m.env_label, plain);
     }
     Ok(env)
 }

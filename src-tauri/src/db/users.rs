@@ -8,6 +8,8 @@ use crate::error::{AppError, AppResult};
 pub struct UserProfile {
     pub email: String,
     pub username: String,
+    pub first_name: String,
+    pub last_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -48,17 +50,27 @@ pub fn get_user(conn: &Connection) -> AppResult<UserRow> {
 }
 
 pub fn get_profile(conn: &Connection) -> AppResult<UserProfile> {
-    let user = get_user(conn)?;
-    Ok(UserProfile {
-        email: user.email,
-        username: user.username,
-    })
+    conn.query_row(
+        "SELECT email, username, first_name, last_name FROM users WHERE id = 'local'",
+        [],
+        |row| {
+            Ok(UserProfile {
+                email: row.get(0)?,
+                username: row.get(1)?,
+                first_name: row.get(2)?,
+                last_name: row.get(3)?,
+            })
+        },
+    )
+    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))
 }
 
 pub fn insert_user(
     conn: &Connection,
     email: &str,
     username: &str,
+    first_name: &str,
+    last_name: &str,
     password_hash: &str,
     totp_secret_enc: Option<&str>,
     second_factor_type: &str,
@@ -68,12 +80,14 @@ pub fn insert_user(
     let now = Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO users (
-            id, email, username, avatar_url, password_hash, totp_secret,
+            id, email, username, first_name, last_name, avatar_url, password_hash, totp_secret,
             second_factor_type, totp_enabled, biometric_enrolled, created_at, last_signed_in_at
-        ) VALUES ('local', ?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+        ) VALUES ('local', ?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
         ON CONFLICT(id) DO UPDATE SET
             email = excluded.email,
             username = excluded.username,
+            first_name = excluded.first_name,
+            last_name = excluded.last_name,
             password_hash = excluded.password_hash,
             totp_secret = excluded.totp_secret,
             second_factor_type = excluded.second_factor_type,
@@ -83,6 +97,8 @@ pub fn insert_user(
         params![
             email,
             username,
+            first_name,
+            last_name,
             password_hash,
             totp_secret_enc,
             second_factor_type,
@@ -109,6 +125,8 @@ pub fn update_profile(
     conn: &Connection,
     email: Option<&str>,
     username: Option<&str>,
+    first_name: Option<&str>,
+    last_name: Option<&str>,
 ) -> AppResult<UserProfile> {
     if let Some(email) = email {
         let email = email.trim().to_lowercase();
@@ -129,6 +147,20 @@ pub fn update_profile(
         conn.execute(
             "UPDATE users SET username = ?1 WHERE id = 'local'",
             [username],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
+    if let Some(first_name) = first_name {
+        conn.execute(
+            "UPDATE users SET first_name = ?1 WHERE id = 'local'",
+            [first_name.trim()],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
+    if let Some(last_name) = last_name {
+        conn.execute(
+            "UPDATE users SET last_name = ?1 WHERE id = 'local'",
+            [last_name.trim()],
         )
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
     }

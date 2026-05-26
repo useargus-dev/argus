@@ -34,6 +34,8 @@ pub fn get_second_factor_status(state: State<'_, AppState>) -> Result<SecondFact
 pub struct UpdateProfileRequest {
     pub email: Option<String>,
     pub username: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
 }
 
 #[tauri::command]
@@ -45,7 +47,7 @@ pub fn update_profile(
     session::touch_and_check_auto_lock(&app, &state, true).map_err(|e| String::from(e))?;
 
     session::with_db(&state, |conn, _inner| {
-        users::update_profile(conn, req.email.as_deref(), req.username.as_deref())
+        users::update_profile(conn, req.email.as_deref(), req.username.as_deref(), req.first_name.as_deref(), req.last_name.as_deref())
     })
     .map_err(|e| String::from(e))
 }

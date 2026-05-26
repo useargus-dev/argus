@@ -8,13 +8,15 @@ interface RegisterState {
   step: RegisterStep;
   email: string;
   username: string;
+  firstName: string;
+  lastName: string;
   password: string;
   secondFactorType: SecondFactorType;
   totpSetup: TotpSetup | null;
   totpCode: string;
   biometricReady: boolean;
   setStep: (step: RegisterStep) => void;
-  setAccount: (email: string, username: string, password: string) => void;
+  setAccount: (email: string, username: string, firstName: string, lastName: string, password: string) => void;
   setSecondFactorType: (t: SecondFactorType) => void;
   setTotpSetup: (setup: TotpSetup | null) => void;
   setTotpCode: (code: string) => void;
@@ -26,6 +28,8 @@ const initial = {
   step: 1 as RegisterStep,
   email: "",
   username: "",
+  firstName: "",
+  lastName: "",
   password: "",
   secondFactorType: "totp" as SecondFactorType,
   totpSetup: null as TotpSetup | null,
@@ -36,7 +40,7 @@ const initial = {
 export const useRegisterStore = create<RegisterState>((set) => ({
   ...initial,
   setStep: (step) => set({ step }),
-  setAccount: (email, username, password) => set({ email, username, password }),
+  setAccount: (email, username, firstName, lastName, password) => set({ email, username, firstName, lastName, password }),
   setSecondFactorType: (secondFactorType) =>
     set({ secondFactorType, biometricReady: false, totpSetup: null, totpCode: "" }),
   setTotpSetup: (totpSetup) => set({ totpSetup }),

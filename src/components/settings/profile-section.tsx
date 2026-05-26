@@ -16,11 +16,15 @@ interface ProfileSectionProps {
 export function ProfileSection({ profile }: ProfileSectionProps) {
   const setSignedIn = useAuthStore((s) => s.setSignedIn);
   const scopes = useAuthStore((s) => s.scopes);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setFirstName(profile?.firstName ?? "");
+    setLastName(profile?.lastName ?? "");
     setUsername(profile?.username ?? "");
     setEmail(profile?.email ?? "");
   }, [profile]);
@@ -30,6 +34,8 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
     setSaving(true);
     try {
       const updated = await bridge.updateProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         username: username.trim(),
         email: email.trim(),
       });
@@ -43,10 +49,27 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
   }
 
   const dirty =
-    username !== (profile?.username ?? "") || email !== (profile?.email ?? "");
+    firstName !== (profile?.firstName ?? "") ||
+    lastName !== (profile?.lastName ?? "") ||
+    username !== (profile?.username ?? "") ||
+    email !== (profile?.email ?? "");
 
   return (
     <SettingsSection title="Profile" icon={User}>
+      <SettingsRow label="First name">
+        <ArgusInput
+          className="min-w-[12rem] flex-1"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+        />
+      </SettingsRow>
+      <SettingsRow label="Last name">
+        <ArgusInput
+          className="min-w-[12rem] flex-1"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+        />
+      </SettingsRow>
       <SettingsRow label="Username">
         <ArgusInput
           className="min-w-[12rem] flex-1"

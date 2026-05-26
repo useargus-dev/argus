@@ -1,4 +1,4 @@
--- Argus base schema. Fresh databases apply this file once (version 1).
+-- Argus unified schema. Fresh databases apply this file once (version 1).
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version     INTEGER PRIMARY KEY,
@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   id                  TEXT PRIMARY KEY DEFAULT 'local',
   email               TEXT NOT NULL UNIQUE,
   username            TEXT NOT NULL UNIQUE,
+  first_name          TEXT NOT NULL DEFAULT '',
+  last_name           TEXT NOT NULL DEFAULT '',
   avatar_url          TEXT,
   password_hash       TEXT NOT NULL,
   totp_secret         TEXT,
@@ -74,36 +76,30 @@ CREATE TABLE IF NOT EXISTS app_buckets (
 );
 
 CREATE TABLE IF NOT EXISTS bucket_mappings (
-  id          TEXT PRIMARY KEY,
-  bucket_id   TEXT NOT NULL REFERENCES app_buckets(id) ON DELETE CASCADE,
-  env_label   TEXT NOT NULL,
-  secret_id   TEXT NOT NULL REFERENCES secrets(id) ON DELETE RESTRICT,
-  created_at  TEXT NOT NULL,
+  id            TEXT PRIMARY KEY,
+  bucket_id     TEXT NOT NULL REFERENCES app_buckets(id) ON DELETE CASCADE,
+  env_label     TEXT NOT NULL,
+  mapping_type  TEXT NOT NULL DEFAULT 'secret',
+  secret_id     TEXT REFERENCES secrets(id) ON DELETE RESTRICT,
+  text_value    TEXT,
+  created_at    TEXT NOT NULL,
   UNIQUE(bucket_id, env_label)
-);
-
-CREATE TABLE IF NOT EXISTS approvals (
-  id              TEXT PRIMARY KEY,
-  bucket_id       TEXT REFERENCES app_buckets(id) ON DELETE CASCADE,
-  process_path    TEXT NOT NULL,
-  working_dir     TEXT NOT NULL,
-  process_name    TEXT,
-  pid             INTEGER,
-  granted_at      TEXT NOT NULL,
-  expires_at      TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS client_grants (
   id              TEXT PRIMARY KEY,
   bucket_id       TEXT NOT NULL REFERENCES app_buckets(id) ON DELETE CASCADE,
-  uri_hash        TEXT NOT NULL,
-  uri_display     TEXT NOT NULL,
+  fingerprint     TEXT NOT NULL,
   token_hash      TEXT NOT NULL,
   client_label    TEXT,
   granted_at      TEXT NOT NULL,
   expires_at      TEXT NOT NULL,
   last_seen_at    TEXT,
-  UNIQUE(bucket_id, uri_hash, token_hash)
+  cwd             TEXT,
+  exe_path        TEXT,
+  git_remote      TEXT,
+  run_args        TEXT,
+  UNIQUE(bucket_id, fingerprint, token_hash)
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

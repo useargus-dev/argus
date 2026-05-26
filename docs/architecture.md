@@ -464,7 +464,7 @@ The `/requests` route renders in a separate compact window opened from the syste
 | `secrets` | All secret types; `value` = AES-GCM blob |
 | `secrets_fts` | FTS5 on `name`, `description` |
 | `app_buckets` | Named env groupings |
-| `bucket_mappings` | `env_label` → `secret_id` |
+| `bucket_mappings` | `env_label` → `secret_id` or encrypted `text_value` |
 | `approvals` | Process identity + TTL |
 | `audit_log` | Append-only events |
 | `settings` | Key-value preferences |

@@ -17,6 +17,8 @@ export function RegisterFactorForm() {
   const {
     email,
     username,
+    firstName,
+    lastName,
     password,
     secondFactorType,
     totpCode,
@@ -47,6 +49,8 @@ export function RegisterFactorForm() {
       await bridge.registerValidate({
         email: email.trim(),
         username: username.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         password,
         secondFactorType,
         totpSecret: secondFactorType === "totp" ? totpSetup?.secret : undefined,

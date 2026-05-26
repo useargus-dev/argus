@@ -12,12 +12,15 @@ const links = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-function getInitials(username: string): string {
-  const parts = username.split(/[\s._-]+/).filter(Boolean);
+function getInitials(profile: { firstName: string; lastName: string; username: string }): string {
+  if (profile.firstName && profile.lastName) {
+    return (profile.firstName[0] + profile.lastName[0]).toUpperCase();
+  }
+  const parts = profile.username.split(/[\s._-]+/).filter(Boolean);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
-  return username.slice(0, 2).toUpperCase();
+  return profile.username.slice(0, 2).toUpperCase();
 }
 
 export function Sidebar() {
@@ -51,13 +54,18 @@ export function Sidebar() {
       {profile && (
         <div className="flex shrink-0 items-center gap-3 border-t border-border p-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-full border border-accent/30 bg-accent/15 text-xs font-semibold text-accent">
-            {getInitials(profile.username)}
+            {getInitials(profile)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-text">
+            {(profile.firstName || profile.lastName) && (
+              <p className="truncate text-sm font-medium text-text">
+                {profile.firstName} {profile.lastName}
+              </p>
+            )}
+            <p className="truncate text-xs text-text-muted">
               {profile.username}
             </p>
-            <p className="truncate text-xs text-text-muted">{profile.email}</p>
+            <p className="truncate text-[11px] text-text-muted">{profile.email}</p>
           </div>
         </div>
       )}

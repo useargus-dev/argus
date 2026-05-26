@@ -25,14 +25,18 @@ export interface BucketMapping {
   id: string;
   bucketId: string;
   envLabel: string;
-  secretId: string;
-  secretName: string;
-  secretType: string;
+  mappingType: "secret" | "text";
+  secretId?: string | null;
+  secretName?: string | null;
+  secretType?: string | null;
+  textValue?: string | null;
   createdAt: string;
 }
 
 export interface UpsertMappingInput {
   bucketId: string;
   envLabel: string;
-  secretId: string;
+  mappingType: "secret" | "text";
+  secretId?: string;
+  textValue?: string;
 }

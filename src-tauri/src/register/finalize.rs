@@ -120,6 +120,7 @@ fn finalize_inner(
                     inner.scope_status()
                 };
                 let _ = app.emit("scope-changed", scopes);
+                crate::ipc::start_for_app(app);
             }
             _ => {}
         }
@@ -178,6 +179,8 @@ fn establish_session(
             &conn,
             &draft.email,
             &draft.username,
+            &draft.first_name,
+            &draft.last_name,
             &draft.password_hash,
             totp_enc.as_deref(),
             &draft.second_factor_type,

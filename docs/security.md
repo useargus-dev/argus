@@ -153,7 +153,13 @@ $argon2id$v=19$m=65536,t=3,p=4$<salt_b64>$<hash_b64>
 | AAD         | optional: `secret_id` as associated data (bind ciphertext to row)       |
 | Stored form | `base64(nonce ‖ ciphertext ‖ tag)`                                      |
 
-**Rotation:** Changing master password must re-encrypt all `value` blobs (document in settings flow).
+**Applies to:**
+- `secrets.value` — vault secret payloads
+- `bucket_mappings.text_value` — inline text values in bucket environment mappings
+
+Both use the same `value_key` and encrypt/decrypt via `crypto::encryption::{encrypt_value, decrypt_value}`.
+
+**Rotation:** Changing master password must re-encrypt all `value` and `text_value` blobs (document in settings flow).
 
 ### 4.4 TOTP (second factor)
 

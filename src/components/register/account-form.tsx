@@ -10,12 +10,16 @@ import { useRegisterStore } from "../../state/register-store";
 const MIN_PASSWORD = 10;
 
 export function RegisterAccountForm() {
-  const { email, username, setAccount, setStep } = useRegisterStore();
+  const { email, username, firstName, lastName, setAccount, setStep } = useRegisterStore();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("First and last name are required");
+      return;
+    }
     if (password.length < MIN_PASSWORD) {
       toast.error(`Password must be at least ${MIN_PASSWORD} characters`);
       return;
@@ -24,13 +28,35 @@ export function RegisterAccountForm() {
       toast.error("Passwords do not match");
       return;
     }
-    setAccount(email.trim(), username.trim(), password);
+    setAccount(email.trim(), username.trim(), firstName.trim(), lastName.trim(), password);
     setStep(2);
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="First name">
+            <ArgusInput
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) =>
+                useRegisterStore.setState({ firstName: e.target.value })
+              }
+              required
+            />
+          </Field>
+          <Field label="Last name">
+            <ArgusInput
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) =>
+                useRegisterStore.setState({ lastName: e.target.value })
+              }
+              required
+            />
+          </Field>
+        </div>
         <Field label="Email">
           <ArgusInput
             type="email"

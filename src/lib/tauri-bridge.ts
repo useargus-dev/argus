@@ -55,6 +55,8 @@ export const bridge = {
   registerValidate: (req: {
     email: string;
     username: string;
+    firstName: string;
+    lastName: string;
     password: string;
     secondFactorType: SecondFactorType;
     totpSecret?: string;
@@ -73,7 +75,7 @@ export const bridge = {
   lockApp: () => call<ScopeStatus>("lock_app"),
   getScopeStatus: () => call<ScopeStatus>("get_scope_status"),
   getProfile: () => call<UserProfile>("get_profile"),
-  updateProfile: (req: { email?: string; username?: string }) =>
+  updateProfile: (req: { email?: string; username?: string; firstName?: string; lastName?: string }) =>
     call<UserProfile>("update_profile", { req }),
   getSecondFactorStatus: () =>
     call<SecondFactorStatus>("get_second_factor_status"),

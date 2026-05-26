@@ -11,6 +11,8 @@ use crate::db::DbPool;
 pub struct RegisterDraft {
     pub email: String,
     pub username: String,
+    pub first_name: String,
+    pub last_name: String,
     /// Master password kept only until finalize completes (memory-only).
     pub password: String,
     pub password_hash: String,

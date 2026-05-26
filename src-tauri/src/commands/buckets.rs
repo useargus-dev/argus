@@ -19,7 +19,9 @@ pub struct CreateBucketRequest {
 pub struct UpsertMappingRequest {
     pub bucket_id: String,
     pub env_label: String,
-    pub secret_id: String,
+    pub mapping_type: String,
+    pub secret_id: Option<String>,
+    pub text_value: Option<String>,
 }
 
 fn require_buckets(inner: &crate::state::AppStateInner) -> AppResult<()> {
@@ -119,7 +121,10 @@ pub fn list_bucket_mappings(
     session::with_db(&state, |conn, inner| {
         session::sync_scopes(&app, inner);
         require_buckets(inner)?;
-        bucket_mappings::list_mappings(conn, &bucket_id).map_err(|e| e.into())
+        let vk = inner
+            .value_key()
+            .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
+        bucket_mappings::list_mappings(conn, &bucket_id, &vk).map_err(|e| e.into())
     })
     .map_err(|e| String::from(e))
 }
@@ -135,11 +140,17 @@ pub fn upsert_bucket_mapping(
     session::with_db(&state, |conn, inner| {
         session::sync_scopes(&app, inner);
         require_buckets(inner)?;
+        let vk = inner
+            .value_key()
+            .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
         bucket_mappings::upsert_mapping(
             conn,
             &req.bucket_id,
             &req.env_label,
-            &req.secret_id,
+            &req.mapping_type,
+            req.secret_id.as_deref(),
+            req.text_value.as_deref(),
+            &vk,
         )
         .map_err(|e| e.into())
     })
