@@ -177,7 +177,6 @@ mod win {
 mod linux {
     use super::ProcInfo;
     use std::fs;
-    use std::path::PathBuf;
 
     pub fn read_proc_info(pid: u32) -> Option<ProcInfo> {
         let cmdline_path = format!("/proc/{pid}/cmdline");

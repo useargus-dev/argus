@@ -57,7 +57,6 @@ jobs:
 
   build:
     needs: create-release
-    environment: release
     strategy:
       fail-fast: false
       matrix:
