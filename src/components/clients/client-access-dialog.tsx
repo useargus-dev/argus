@@ -21,7 +21,7 @@ export function ClientAccessDialog({ request, onClose }: ClientAccessDialogProps
 
   useEffect(() => {
     if (request) setTtl(request.accessTtlMinutes || 60);
-  }, [request?.requestId]);
+  }, [request]);
 
   const respond = useCallback(
     async (accept: boolean) => {

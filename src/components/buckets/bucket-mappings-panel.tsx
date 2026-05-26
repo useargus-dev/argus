@@ -191,10 +191,10 @@ export function BucketMappingsPanel({
                   key={mapping.id}
                   className="grid gap-2 rounded-lg border border-border bg-surface-raised/40 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] sm:items-center sm:gap-3"
                 >
-                  <div className="min-w-0">
-                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                       Env name
-                    </label>
+                    </span>
                     <ArgusInput
                       value={edit.envLabel}
                       onChange={(e) =>
@@ -204,11 +204,11 @@ export function BucketMappingsPanel({
                       className="font-mono text-xs uppercase"
                       disabled={savingKey === rowKey}
                     />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
+                  </label>
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                       Vault secret
-                    </label>
+                    </span>
                     <SecretPicker
                       secrets={secrets}
                       value={edit.secretId}
@@ -217,7 +217,7 @@ export function BucketMappingsPanel({
                       }
                       disabled={savingKey === rowKey}
                     />
-                  </div>
+                  </label>
                   <div className="flex justify-end gap-1">
                     {dirty && (
                       <button
@@ -253,10 +253,10 @@ export function BucketMappingsPanel({
                 key={draft.key}
                 className="grid gap-2 rounded-lg border border-dashed border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] sm:items-center sm:gap-3"
               >
-                <div className="min-w-0">
-                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-text-muted sm:sr-only">
                     Env name
-                  </label>
+                  </span>
                   <ArgusInput
                     value={draft.envLabel}
                     onChange={(e) =>
@@ -267,7 +267,7 @@ export function BucketMappingsPanel({
                     autoFocus
                     disabled={savingKey === draft.key}
                   />
-                </div>
+                </label>
                 <div className="flex min-w-0">
                   <SecretPicker
                     secrets={secrets}

@@ -7,6 +7,7 @@ export function Label({
   ...props
 }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
+    // eslint-disable-next-line jsx-a11y/label-has-associated-control -- primitive; callers pass htmlFor
     <label
       className={cn("text-sm font-medium text-text", className)}
       {...props}

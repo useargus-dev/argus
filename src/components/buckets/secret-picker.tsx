@@ -91,7 +91,7 @@ export function SecretPicker({
             <li>No secrets match</li>
           ) : (
             filtered.map((s) => (
-              <li key={s.id} role="option">
+              <li key={s.id} role="option" aria-selected={s.id === value}>
                 <button
                   type="button"
                   className={cn(

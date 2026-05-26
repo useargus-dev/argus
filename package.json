@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "lint": "eslint .",
     "db:reset": "tsx scripts/reset-db.ts",
     "ipc:test": "tsx scripts/ipc-request.ts"
   },
@@ -24,6 +25,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@hookform/resolvers": "^5.4.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2",
@@ -35,6 +37,9 @@
     "@vitejs/plugin-react": "^4.6.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.2.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "fuse.js": "^7.3.0",
     "qrcode.react": "^4.2.0",
     "react-hook-form": "^7.76.0",
@@ -43,6 +48,7 @@
     "tailwindcss": "^4.3.0",
     "tsx": "^4.20.3",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.60.0",
     "vite": "^7.0.4",
     "zod": "^4.4.3"
   }

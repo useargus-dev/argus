@@ -33,7 +33,6 @@ export function BucketEnvCredentials({
 
   useEffect(() => {
     setRevealed(false);
-    setToken(cachedToken ?? null);
   }, [bucketId]);
 
   useEffect(() => {

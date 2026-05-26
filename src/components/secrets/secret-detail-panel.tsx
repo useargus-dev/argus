@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { Copy, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 
 import {
@@ -72,7 +72,6 @@ export function SecretDetailPanel({
     );
   }
 
-  const Icon = secretTypeIcon(detail.secretType);
   const days = daysUntilExpiry(detail.expiresAt);
 
   async function handleCopy() {
@@ -89,7 +88,7 @@ export function SecretDetailPanel({
       <div className="flex h-full flex-col">
         <div className="flex items-start gap-4">
           <div className="grid size-12 shrink-0 place-items-center rounded-lg border border-accent/30 bg-accent/10">
-            <Icon className="size-5 text-accent" aria-hidden />
+            {createElement(secretTypeIcon(detail.secretType), { className: "size-5 text-accent", "aria-hidden": true })}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold leading-tight">{detail.name}</h2>
