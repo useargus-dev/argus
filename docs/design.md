@@ -320,7 +320,7 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 
 ### 5.5 App Buckets (`/buckets`)
 
-**Authorization:** Buckets follow app unlock (**APP** / **BUCKETS** — equivalent). Idle app lock applies to tray/IPC admin the same as vault.
+**Authorization:** Buckets follow app unlock (**APP** / **BUCKETS** — equivalent). Idle app lock blocks bucket **management UI** only; IPC and client approvals are unchanged.
 
 **List view:** Cards with name, mapping count, active client grants, tray-active indicator.
 
@@ -391,12 +391,12 @@ Default route after sign-in. Full bento spec in [§10 Bento Layout System](#10-b
 
 | Chip | Meaning |
 |---|---|
-| `App locked` | Idle timeout — `AppLockModal` (TOTP or biometric) |
-| `App unlocked` | Dashboard, vault, settings available |
+| `App locked` | Idle timeout — vault/buckets/settings blocked; IPC and approvals still active |
+| `App unlocked` | Dashboard, vault, buckets, settings available |
 
 ### `AppLockModal`
 
-Full-screen overlay when idle app lock fires. TOTP or biometric only (password not required until sign-out or app restart). Vault secrets use the same lock — no separate vault modal.
+Full-screen overlay when idle app lock fires on vault, buckets, dashboard, and settings routes. TOTP or biometric only (password not required until sign-out or app restart). **Does not block** the requests window or approvals page — process access requests and grant management remain available while locked.
 
 ---
 

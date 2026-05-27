@@ -43,18 +43,22 @@ Argus replaces plaintext `.env` files in projects with:
 | `ARGUS_BUCKET_ID=<uuid>` | Full secret values, encrypted |
 | Optional `.env` fallback keys | Typed schemas, expiry, audit |
 
-**Core guarantees (when locked):**
+**Core guarantees (always at rest):**
 
 - `~/.argus/argus.db` is opaque (SQLCipher AES-256).
-- No socket / named pipe endpoint exists.
-- No secret material in frontend memory beyond the active unlocked session UI.
 
-**Core guarantees (when signed in):**
+**Core guarantees (when signed out):**
+
+- No socket / named pipe endpoint exists; `db_key` zeroized; SQLCipher pool closed.
+- No secret material in frontend memory.
+
+**Core guarantees (when signed in — including while app is soft-locked):**
 
 - **Argus core** may run in the **system tray** with the main window closed; active buckets stay visible and IPC stays up.
 - External apps connect via **local IPC** with `bucket_id` + `client_token`. Client identity is derived server-side via OS process inspection and hashed into a **fingerprint**.
 - **New clients** always trigger a user approval popup; returning clients use **per-bucket TTL / refresh** policy.
-- **Three authorization scopes** gate the UI shell, vault CRUD, and bucket CRUD (see §12).
+- **Process access requests and grant approvals** continue while the app is soft-locked (only sign-in required).
+- **App soft lock** blocks vault, buckets, dashboard, and settings UI — not IPC or approvals (see §12).
 - Injectable secret types are enforced in **Rust**, not the UI.
 
 ---
@@ -154,7 +158,8 @@ Argus has **three operational states**:
 | State | Socket / tray | DB connection | UI |
 |---|---|---|---|
 | **Signed out** | Stopped; tray hidden | Closed / key zeroized | `/login` |
-| **Signed in** | Listening + tray active | Open SQLCipher pool | Dashboard / vault / buckets / settings |
+| **Signed in, app unlocked** | Listening + tray active | Open SQLCipher pool | Dashboard / vault / buckets / settings / approvals |
+| **Signed in, app locked** | Listening + tray active (IPC **unchanged**) | Open SQLCipher pool (keys in memory) | Vault/buckets/settings blocked; **requests + approvals still work** |
 | **Window closed** | Tray + IPC **remain** if user enabled “Run in background” | Stays open until sign-out | None (tray only) |
 | **First run** | Stopped | Creating schema + account + **mandatory 2FA** | `/register` |
 
@@ -187,19 +192,31 @@ Open SQLCipher → spawn background jobs → start socket server → show tray
 
 User chooses **TOTP or biometric** at setup — **not optional** to skip both.
 
-### Sign-out / lock sequence (manual, idle, screen lock, or Settings → Sign out)
+### Sign-out vs soft app lock
+
+**Soft app lock** (`lock_app`, idle `auto_lock_minutes`, or planned screen-lock hook):
 
 ```
-sign_out() or soft app lock invoked or auto-lock fires
+soft_lock_app() or auto-lock fires
         │
-        ├──► sign_out: socket server shutdown + unlink socket file
-        ├──► sign_out: cancel background IPC tasks
-        ├──► sign_out: zeroize keys + clear session; soft lock: app_locked only
-        ├──► sign_out: close DB pool (SQLCipher page cache cleared)
-        └──► emit "signed-out" or "app-locked" → frontend updates auth store
+        ├──► app_locked = true; vault/bucket UI scopes cleared
+        ├──► IPC server, tray, and DB pool **stay running**
+        ├──► pending client requests + approve/deny + grant list/revoke **still work**
+        └──► emit "app-locked" → AppLockModal on vault/buckets/settings routes
 ```
 
-**Scope 2 / 3 (Vault & bucket CRUD) — shipped:** Vault and bucket mutations require **app unlock** only. Separate per-scope elevation was removed; `elevate_vault` / `elevate_buckets` are legacy no-ops when the app is unlocked. Setting `vault_read_requires_elevation` exists in the DB but is not used for a separate elevation step in current builds.
+**Sign-out** (Settings → Sign out, tray menu, or planned screen-lock → sign-out):
+
+```
+sign_out()
+        │
+        ├──► socket server shutdown + unlink socket file
+        ├──► cancel background IPC tasks
+        ├──► zeroize keys + clear session + close DB pool
+        └──► emit "signed-out" → frontend navigates to /login
+```
+
+**Scope 2 / 3 (Vault & bucket CRUD) — shipped:** Vault and bucket mutations require **app unlock** only. Separate per-scope elevation was removed; `elevate_vault` / `elevate_buckets` are legacy no-ops when the app is unlocked. Setting `vault_read_requires_elevation` exists in the DB but is not used for a separate elevation step in current builds. **IPC client access is not gated by app lock** — only by sign-in and grant policy.
 
 ---
 
@@ -445,10 +462,12 @@ src/
 | `/register` | Only if no `users` row | Main |
 | `/login` | When signed out | Main |
 | `/dashboard`, `/vault`, `/buckets`, `/settings` | Requires sign-in + app unlocked | Main |
-| `/approvals` | Requires sign-in + app unlocked | Main |
-| `/requests` | Requires sign-in (works while app locked) | Requests popup |
+| `/approvals` | Requires sign-in only (works while app locked) | Main |
+| `/requests` | Requires sign-in only (works while app locked) | Requests popup |
 
-The `/requests` route renders in a separate compact window opened from the system tray. It shows pending access requests from the last 15 minutes and allows the user to accept/deny them even when the main app is locked. The `/approvals` route is in the main app sidebar and lists all active/expired grants with a revoke option.
+The `/requests` route renders in a separate compact window opened from the system tray. It shows pending access requests from the last 15 minutes and allows the user to accept/deny them even when the main app is locked.
+
+The `/approvals` route is in the main app sidebar and lists all active/expired grants with a revoke option. **App lock does not block approvals** — only vault and bucket management UI require unlock. Sign-out stops IPC entirely.
 
 ---
 
@@ -595,9 +614,10 @@ One local account with **capability scopes** in Rust `AppState` (not separate us
 
 | Scope | ID | Gates | Typical operations |
 |---|---|---|---|
-| **App shell** | `APP` | All routes including **Settings** | Dashboard, settings; cleared on idle **app lock** or sign-out |
+| **App shell** | `APP` | Dashboard, **Settings** | Cleared on idle **app lock** or sign-out |
 | **Vault** | `VAULT` | `/vault` secret CRUD | Same as **APP** while the app is unlocked (no separate vault TTL) |
-| **Buckets** | `BUCKETS` | `/buckets` mutations (future) | Same as **APP** while the app is unlocked (tray/IPC admin follows app lock) |
+| **Buckets** | `BUCKETS` | `/buckets` mutations | Same as **APP** while the app is unlocked |
+| **IPC / approvals** | *(signed-in only)* | Client access requests, grant list/revoke | **Not** gated by app lock; requires sign-in + running core |
 
 ### Session model (implemented)
 
@@ -616,7 +636,7 @@ elevate_buckets() → legacy no-op when app unlocked; buckets follow APP
 | `elevate_vault` | Legacy no-op when app unlocked; vault follows APP |
 | `elevate_buckets` | Legacy no-op when app unlocked; buckets follow APP |
 
-**Vault & buckets:** No separate elevation timers. Available whenever `APP` is unlocked. Idle **`auto_lock_minutes`** soft-locks the whole app (sidebar hidden, `AppLockModal`, TOTP or biometric to resume).
+**Vault & buckets:** No separate elevation timers. Available whenever `APP` is unlocked. Idle **`auto_lock_minutes`** soft-locks vault/buckets/settings UI (`AppLockModal`, TOTP or biometric to resume). **IPC, process requests, and the approvals page are unaffected** — only sign-out stops the socket server.
 
 **Not three separate accounts** — one `users` row, scope flags in memory (never stored plaintext in DB).
 
@@ -711,7 +731,7 @@ Grant identity is `(bucket_id, fingerprint, token_hash)`. Fingerprint is compute
 | `default_access_ttl_minutes` | `60` | Used when bucket has no override |
 | `default_refresh_ttl_minutes` | `NULL` | Global refresh policy |
 | `run_in_background` | `1` | Close window → tray, keep IPC |
-| `auto_lock_minutes` | `30` | Idle app lock (vault and buckets follow app) |
+| `auto_lock_minutes` | `30` | Idle app lock (vault/buckets UI only; IPC and approvals unchanged) |
 
 ### Client access popup (requests window)
 
@@ -800,7 +820,7 @@ Spawned when **signed in** (tray core), cancelled on **sign out**:
 
 | Key | Default | Description |
 |---|---|---|
-| `auto_lock_minutes` | `30` | Idle app lock (vault follows app) |
+| `auto_lock_minutes` | `30` | Idle app lock (vault/buckets UI only; IPC and approvals unchanged) |
 | `default_ttl_minutes` | `60` | Pre-selected approval TTL |
 | `expiry_notify_30d` | `1` | Enable 30-day warnings |
 | `expiry_notify_7d` | `1` | Enable 7-day warnings |

@@ -43,7 +43,7 @@
 | **Integrity**                          | Tampered ciphertext fails GCM verification         |
 | **Accountability**                     | Every secret injection is audit-logged             |
 | **Least privilege**                    | WebView cannot read DB or bind socket              |
-| **Fail secure**                        | Lock destroys socket and zeroizes keys             |
+| **Fail secure**                        | Sign-out destroys socket and zeroizes keys; soft lock does not |
 | **Usable security**                    | `.env` fallback optional; approvals show full path |
 
 ---
@@ -235,7 +235,11 @@ Always requires:
 
 **Sign-in (cold start / sign-out):** password + TOTP **or** biometric. Unlocks SQLCipher and grants **APP** scope.
 
-**App lock (idle while process running):** After `auto_lock_minutes` without user activity, the app soft-locks. Keys remain in memory; **`unlock_app`** requires TOTP **or** biometric only (no password). **VAULT** scope matches **APP** — there is no separate vault idle timer.
+**App lock (idle while process running):** After `auto_lock_minutes` without user activity, the app soft-locks. Keys remain in memory; **`unlock_app`** requires TOTP **or** biometric only (no password). **VAULT** and **BUCKETS** scopes match **APP** — there is no separate vault idle timer.
+
+**What app lock blocks:** vault CRUD, bucket CRUD, dashboard, and settings UI (`AppLockModal` on those routes).
+
+**What app lock does not block:** local IPC server, incoming process access requests, approve/deny in the requests window, grant list/revoke on the approvals page, and env injection for already-approved clients. Only **sign-out** stops IPC.
 
 **Settings page** is available when the app is unlocked. Security prefs include **`auto_lock_minutes`** only (vault and buckets share app lock).
 
@@ -277,7 +281,7 @@ Biometric unlocks a **device-bound** key in OS secure storage — it does **not*
 
 ## 8. IPC, Client Tokens & Socket Hardening
 
-**Shipped** on desktop while signed in. IPC requests can be processed and approved **even when the app is locked** — only sign-in status is required.
+**Shipped** on desktop while signed in. IPC requests can be processed and approved **even when the app is locked** — only sign-in status is required. The requests window and approvals page both remain usable; app lock gates vault and bucket management UI only.
 
 ### 8.1 Transport
 
@@ -306,7 +310,7 @@ Desktop UI shows `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` in project `.env`. I
 
 ### 8.4 Core must be signed in
 
-`locked` response if tray core stopped (user signed out). Libraries may fall back to `.env` per global setting. Note: **app lock** does not block IPC — requests are processed and the user can accept/deny grants while the vault UI is locked. Only sign-out stops the IPC server.
+`locked` response if tray core stopped (user signed out). Libraries may fall back to `.env` per global setting. Note: **app lock** does not block IPC — requests are processed and the user can accept/deny grants or manage approvals while the vault UI is locked. Only sign-out stops the IPC server.
 
 ---
 
@@ -385,7 +389,7 @@ The **requests window** is a compact bottom-right popup opened via system tray (
 
 ### 9.4 Revocation
 
-- Per-grant revoke from the **Approvals page** (main app sidebar)
+- Per-grant revoke from the **Approvals page** (main app sidebar) — available while app is locked
 - “Revoke all clients” in settings danger zone (app unlocked + password when implemented)
 
 ---
@@ -399,7 +403,7 @@ The **requests window** is a compact bottom-right popup opened via system tray (
 | Sign out from tray             | Full teardown (keys zeroized)        |
 | Left-click (signed in)         | Opens requests window (not main app) |
 | Left-click (not signed in)     | Opens main app for sign-in           |
-| App lock ≠ IPC block           | Requests processed while vault locked|
+| App lock ≠ IPC block           | IPC, requests, and approvals work while vault UI locked |
 
 **Threat:** Unlocked laptop + tray running → approved clients can fetch secrets. Mitigate: auto-lock, screen lock → sign-out, short access TTL.
 
