@@ -26,4 +26,4 @@ Older docs may mention separate “elevate vault/buckets” steps; that was simp
 - Read [security.md](./security.md) § Known limitations.
 - **IPC** (socket/pipe, advanced fingerprint, grants, requests popup window) and **tray** (hide-on-close, left-click opens requests) are **shipped**. **Client libraries** are **planned** — see [architecture.md](./architecture.md) §11 and `pnpm ipc:test` (`scripts/ipc-request.ts`).
 - **Approvals page** in main app sidebar — view and revoke all client grants.
-- **Licensing:** community code is [AGPL-3.0](../LICENSE); proprietary/self-hosted offerings use [COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md).
+- **Licensing:** community code is [AGPL-3.0](../LICENSE). A self-hosted system is on the roadmap. Other commercial licensing uses [COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md).

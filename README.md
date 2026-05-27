@@ -80,7 +80,7 @@ Argus depends on open-source libraries (React, Tauri, SQLCipher, etc.) under the
 | View, fork, and modify the source                                          | Offer a **hosted/SaaS** service without AGPL source compliance |
 | Distribute changes **if** you comply with AGPL (source available to users) | Resell a proprietary derivative without open-sourcing it       |
 
-A **paid self-hosted / team edition** for startups is planned as a separate product; see [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for inquiries.
+A **self-hosted system** is on the roadmap. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for other commercial licensing inquiries.
 
 The **Argus** name and logo are not covered by AGPL — do not imply endorsement for competing products.
 
