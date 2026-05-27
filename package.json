@@ -11,7 +11,8 @@
     "tauri": "tauri",
     "lint": "eslint .",
     "db:reset": "tsx scripts/reset-db.ts",
-    "ipc:test": "tsx scripts/ipc-request.ts"
+    "ipc:test": "tsx scripts/ipc-request.ts",
+    "icon:generate": "tsx scripts/generate-icon.ts && pnpm tauri icon src-tauri/icons/icon.png"
   },
   "dependencies": {
     "@choochmeque/tauri-plugin-biometry-api": "^0.2.8",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@hookform/resolvers": "^5.4.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2",
     "@tauri-apps/plugin-clipboard-manager": "~2",

@@ -1,4 +1,4 @@
-import { BrickWallShield } from "lucide-react";
+import { AppLogo } from "../ui/app-logo";
 
 export function RegisterBrand() {
   return (
@@ -10,11 +10,10 @@ export function RegisterBrand() {
           borderColor: "var(--brand-border)",
         }}
       >
-        <BrickWallShield
+        <AppLogo
           size={20}
           className="text-brand-icon"
           style={{ color: "var(--brand-icon)" }}
-          aria-hidden
         />
       </div>
       <span className="text-lg font-semibold tracking-tight text-text">Argus</span>
