@@ -22,7 +22,7 @@ See [docs/build-deps.md](docs/build-deps.md) for SQLCipher on Windows.
 1. Fork the repository and create a branch from `main` (do not push directly to `main` once branch protection is enabled).
 2. Keep changes focused; match existing code style.
 3. Run `pnpm exec tsc --noEmit` and `pnpm lint` before submitting.
-4. Open a PR into `main`. Wait for the **CI / lint** check to pass before merging.
+4. Open a PR into `main`. Wait for required checks to pass before merging (see below).
 5. Describe **what** and **why** in the PR. Link issues if applicable.
 6. For security-sensitive changes, explain threat/impact in the PR body.
 
@@ -35,10 +35,19 @@ Branch protection is configured in GitHub, not in Actions. In the repo on github
 - Target: `main` (or default branch)
 - **Require a pull request before merging**
 - **Block force pushes**
-- Optional: **Require status checks** → add **CI / lint** (appears after CI has run on at least one PR)
+- Optional: **Require status checks** (appear after the first PR run):
+  - **Lint / lint**
+  - **Tauri / backend**
 - Optional: **Require approvals** (use 0 if you are the only maintainer and merge your own PRs)
 
 Save. After that, direct pushes to `main` are rejected; only merged PRs update `main`.
+
+### PR checks (GitHub Actions)
+
+| Workflow | Check name | What it does |
+| -------- | ---------- | ------------ |
+| [Lint](.github/workflows/lint.yml) | `Lint / lint` | TypeScript + ESLint |
+| [Tauri](.github/workflows/tauri.yml) | `Tauri / backend` | `cargo check` + `cargo test` in `src-tauri/` (the Rust/Tauri core) |
 
 ## License
 
