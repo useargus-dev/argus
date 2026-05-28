@@ -4,16 +4,6 @@
 
 > **Status:** Early development (v0.1). Not security-audited. Use at your own risk for non-production or personal workflows.
 
-## Demo
-
-<p align="center">
-  <img
-    src="docs/assets/screenshots/animation.gif"
-    alt="Argus — registration, vault, buckets, and approvals"
-    width="720"
-  />
-</p>
-
 ## Features (current)
 
 - Encrypted vault (**SQLCipher**) at `~/.argus/argus.db`
