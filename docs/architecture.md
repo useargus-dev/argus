@@ -768,20 +768,27 @@ Access matrix enforced in `ipc/handler.rs` and `commands/secrets.rs`.
 
 ## 16. Client Libraries & CLI
 
+### Published SDKs
+
+| Language | Package | Status |
+|---|---|---|
+| **Node.js** | [`@useargus/node`](https://www.npmjs.com/package/@useargus/node) — [node-argus](https://github.com/useargus-dev/node-argus) | **Shipped** — `loadEnv()` |
+| Python | `argus-secrets` (planned) | In development |
+| Go | `argus-go` (planned) | In development |
+| Ruby | `argus-secrets` gem (planned) | In development |
+| Java | JVM library (planned) | In development |
+
 ### Monorepo layout (recommended)
 
 ```
-argus/
-├── apps/desktop/          # Tauri app (current `argus/`)
-├── crates/argus-core/     # Shared protocol types (optional)
-├── clients/
-│   ├── python/argus_secrets/
-│   ├── node/@argus-secrets/node/
-│   └── cli/               # Rust binary, shares socket client code
+argus-project/
+├── argus/                 # Desktop app (this repo path)
+├── node-argus/            # @useargus/node (published)
+├── clients/               # Future: python, go, ruby, java, cli
 └── docs/
 ```
 
-### Library contract (future Python/Node — not v1 UI scope)
+### Library contract (all SDKs)
 
 1. Read `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` from `.env` (or env).
 2. Connect to `~/.argus/argus.sock` / `\\.\pipe\argus`.
