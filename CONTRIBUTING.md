@@ -19,26 +19,26 @@ See [docs/build-deps.md](docs/build-deps.md) for SQLCipher on Windows.
 
 ## Pull requests
 
-`main` is protected: **no direct pushes**. Open a branch, open a PR, get at least one approval, and wait for the **CI / lint** check to pass before merging.
-
-1. Fork the repository and create a branch from `main`.
+1. Fork the repository and create a branch from `main` (do not push directly to `main` once branch protection is enabled).
 2. Keep changes focused; match existing code style.
 3. Run `pnpm exec tsc --noEmit` and `pnpm lint` before submitting.
-4. Describe **what** and **why** in the PR. Link issues if applicable.
-5. For security-sensitive changes, explain threat/impact in the PR body.
+4. Open a PR into `main`. Wait for the **CI / lint** check to pass before merging.
+5. Describe **what** and **why** in the PR. Link issues if applicable.
+6. For security-sensitive changes, explain threat/impact in the PR body.
 
-### Branch protection (maintainers)
+### Protect `main` on GitHub (maintainers, one-time)
 
-Protection is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json) and applied with the [**Sync branch protection**](.github/workflows/sync-branch-protection.yml) workflow (`workflow_dispatch`).
+Branch protection is configured in GitHub, not in Actions. In the repo on github.com:
 
-After the first merge of these files, enable protection either way:
+**Settings → Rules → Rulesets → New branch ruleset** (or **Settings → Branches → Add rule** for classic protection):
 
-1. **Workflow:** add secret `REPO_ADMIN_TOKEN` (PAT with **Administration** read/write on this repo), then run **Actions → Sync branch protection**.
-2. **Manual:** **Settings → Rules → Rulesets → Import a ruleset** and choose `.github/rulesets/protect-main.json`.
+- Target: `main` (or default branch)
+- **Require a pull request before merging**
+- **Block force pushes**
+- Optional: **Require status checks** → add **CI / lint** (appears after CI has run on at least one PR)
+- Optional: **Require approvals** (use 0 if you are the only maintainer and merge your own PRs)
 
-Both create the same ruleset: PR-only updates to `main`, 1 required review, no force-push/delete, and required **CI / lint**.
-
-To change rules (e.g. review count), edit `protect-main.json` and re-run the sync workflow. Solo maintainers who cannot get a second reviewer may lower `required_approving_review_count` to `0` while keeping the PR-only rule.
+Save. After that, direct pushes to `main` are rejected; only merged PRs update `main`.
 
 ## License
 
