@@ -1,8 +1,12 @@
-# Applies .github/rulesets/protect-main.json to the repository via the Rulesets API.
-# Branch protection is enforced by GitHub rulesets, not by this workflow blocking pushes.
+# Applies .github/rulesets/protect-main.json via the Rulesets API.
 #
-# Run once after merging (Settings → Actions → "Sync branch protection" → Run workflow),
-# or push an update to protect-main.json and re-run manually.
+# Setup (once): add repository secret REPO_ADMIN_TOKEN — a fine-grained PAT with
+# Administration read/write on this repo, or a classic PAT with repo scope.
+#
+# Then: Actions → "Sync branch protection" → Run workflow.
+#
+# Without the secret, import protect-main.json manually:
+# Settings → Rules → Rulesets → New ruleset → Import a ruleset.
 
 name: Sync branch protection
 
@@ -10,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  administration: write
+  contents: read
 
 jobs:
   sync-ruleset:
@@ -18,9 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Require admin token
+        if: ${{ secrets.REPO_ADMIN_TOKEN == '' }}
+        run: |
+          echo "::error::Add repository secret REPO_ADMIN_TOKEN (PAT with Administration read/write on this repo)."
+          echo "::error::Or import .github/rulesets/protect-main.json via Settings → Rules → Rulesets."
+          exit 1
+
       - name: Apply repository ruleset
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.REPO_ADMIN_TOKEN }}
           script: |
             const fs = require("fs");
             const path = ".github/rulesets/protect-main.json";

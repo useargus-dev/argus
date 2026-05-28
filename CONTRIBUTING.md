@@ -31,7 +31,12 @@ See [docs/build-deps.md](docs/build-deps.md) for SQLCipher on Windows.
 
 Protection is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json) and applied with the [**Sync branch protection**](.github/workflows/sync-branch-protection.yml) workflow (`workflow_dispatch`).
 
-After the first merge of these files, run that workflow once from **Actions** (repo admin). It creates/updates the GitHub ruleset: PR-only updates to `main`, 1 required review, no force-push/delete, and required **CI / lint**.
+After the first merge of these files, enable protection either way:
+
+1. **Workflow:** add secret `REPO_ADMIN_TOKEN` (PAT with **Administration** read/write on this repo), then run **Actions → Sync branch protection**.
+2. **Manual:** **Settings → Rules → Rulesets → Import a ruleset** and choose `.github/rulesets/protect-main.json`.
+
+Both create the same ruleset: PR-only updates to `main`, 1 required review, no force-push/delete, and required **CI / lint**.
 
 To change rules (e.g. review count), edit `protect-main.json` and re-run the sync workflow. Solo maintainers who cannot get a second reviewer may lower `required_approving_review_count` to `0` while keeping the PR-only rule.
 
