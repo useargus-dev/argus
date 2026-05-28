@@ -1,0 +1,79 @@
+# Applies .github/rulesets/protect-main.json to the repository via the Rulesets API.
+# Branch protection is enforced by GitHub rulesets, not by this workflow blocking pushes.
+#
+# Run once after merging (Settings → Actions → "Sync branch protection" → Run workflow),
+# or push an update to protect-main.json and re-run manually.
+
+name: Sync branch protection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  administration: write
+
+jobs:
+  sync-ruleset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply repository ruleset
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const path = ".github/rulesets/protect-main.json";
+            const desired = JSON.parse(fs.readFileSync(path, "utf8"));
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: listed } = await github.request(
+              "GET /repos/{owner}/{repo}/rulesets",
+              { owner, repo, per_page: 100 },
+            );
+
+            const existing = (Array.isArray(listed) ? listed : []).find(
+              (r) => r.name === desired.name,
+            );
+
+            const body = {
+              name: desired.name,
+              target: desired.target,
+              enforcement: desired.enforcement,
+              conditions: desired.conditions,
+              rules: desired.rules,
+              bypass_actors: desired.bypass_actors ?? [],
+            };
+
+            if (existing) {
+              await github.request(
+                "PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}",
+                {
+                  owner,
+                  repo,
+                  ruleset_id: existing.id,
+                  ...body,
+                },
+              );
+              core.info(`Updated ruleset "${desired.name}" (id ${existing.id}).`);
+            } else {
+              const { data: created } = await github.request(
+                "POST /repos/{owner}/{repo}/rulesets",
+                { owner, repo, ...body },
+              );
+              core.info(`Created ruleset "${desired.name}" (id ${created.id}).`);
+            }
+
+            core.summary.addHeading("Branch protection active on default branch");
+            core.summary.addBullet(
+              "Direct pushes to the default branch are blocked; changes must land via pull request.",
+            );
+            core.summary.addBullet(
+              "At least 1 approving review is required before merge.",
+            );
+            core.summary.addBullet(
+              'Required status check: "CI / lint" (strict — branch must be up to date).',
+            );
+            await core.summary.write();

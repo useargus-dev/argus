@@ -19,11 +19,21 @@ See [docs/build-deps.md](docs/build-deps.md) for SQLCipher on Windows.
 
 ## Pull requests
 
+`main` is protected: **no direct pushes**. Open a branch, open a PR, get at least one approval, and wait for the **CI / lint** check to pass before merging.
+
 1. Fork the repository and create a branch from `main`.
 2. Keep changes focused; match existing code style.
-3. Run `pnpm exec tsc --noEmit` before submitting.
+3. Run `pnpm exec tsc --noEmit` and `pnpm lint` before submitting.
 4. Describe **what** and **why** in the PR. Link issues if applicable.
 5. For security-sensitive changes, explain threat/impact in the PR body.
+
+### Branch protection (maintainers)
+
+Protection is defined in [`.github/rulesets/protect-main.json`](.github/rulesets/protect-main.json) and applied with the [**Sync branch protection**](.github/workflows/sync-branch-protection.yml) workflow (`workflow_dispatch`).
+
+After the first merge of these files, run that workflow once from **Actions** (repo admin). It creates/updates the GitHub ruleset: PR-only updates to `main`, 1 required review, no force-push/delete, and required **CI / lint**.
+
+To change rules (e.g. review count), edit `protect-main.json` and re-run the sync workflow. Solo maintainers who cannot get a second reviewer may lower `required_approving_review_count` to `0` while keeping the PR-only rule.
 
 ## License
 
