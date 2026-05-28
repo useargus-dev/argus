@@ -42,8 +42,17 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: RustSec advisory DB
-        uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          workdir: src-tauri
+      - name: Verify Cargo.lock is present
+        working-directory: src-tauri
+        run: |
+          if [ ! -f Cargo.lock ]; then
+            echo "::error::src-tauri/Cargo.lock is missing from the repo. Commit it (required for cargo audit)."
+            exit 1
+          fi
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: cargo audit
+        working-directory: src-tauri
+        run: cargo audit --locked
