@@ -50,9 +50,15 @@ jobs:
             exit 1
           fi
 
+      - name: Cache RustSec advisory DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/advisory-db
+          key: rustsec-advisory-db-${{ runner.os }}-v1
+
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
 
       - name: cargo audit
         working-directory: src-tauri
-        run: cargo audit --locked
+        run: cargo audit
