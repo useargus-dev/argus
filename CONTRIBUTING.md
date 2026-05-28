@@ -48,6 +48,9 @@ Save. After that, direct pushes to `main` are rejected; only merged PRs update `
 | -------- | ---------- | ------------ |
 | [Lint](.github/workflows/lint.yml) | `Lint / lint` | TypeScript + ESLint |
 | [Tauri](.github/workflows/tauri.yml) | `Tauri / backend` | `cargo check` + `cargo test` in `src-tauri/` (the Rust/Tauri core) |
+| [Audit](.github/workflows/audit.yml) | `Audit / audit` | `pnpm audit` (high+) + `cargo audit` via RustSec |
+
+Dependabot opens weekly update PRs for npm and Cargo ([dependabot.yml](.github/dependabot.yml)).
 
 ## License
 

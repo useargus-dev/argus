@@ -1,0 +1,86 @@
+name: Bug report
+description: Report a problem with Argus
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Do not** include real API keys, passwords, or vault contents.
+        For security vulnerabilities, use [GitHub Security Advisories](https://github.com/useargus-dev/argus/security/advisories/new) instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Argus version
+      description: e.g. 0.1.0, or commit SHA from About / `git rev-parse HEAD`
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "e.g. Windows 11 23H2, Ubuntu 24.04, macOS 15"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps from a fresh launch
+      placeholder: |
+        1. Install / run Argus ...
+        2. Go to ...
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Redact secrets. Terminal output, DevTools console, or screenshots help.
+      render: shell
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Vault / secrets
+        - App buckets
+        - IPC / client access
+        - Auth / 2FA / lock
+        - Settings / tray
+        - Install / build
+        - Other
+    validations:
+      required: true
