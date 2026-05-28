@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest an idea for Argus
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and the change you want. Large features (IPC protocol, client SDKs) should align with [docs/plan.md](https://github.com/useargus-dev/argus/blob/main/docs/plan.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What pain point does this solve?
+      placeholder: "As a developer, I want to ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should Argus behave?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other tools or approaches you looked at (pass, 1Password CLI, dotenv, etc.)
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Desktop app (UI)
+        - Rust / Tauri backend
+        - IPC / client libraries
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a PR for this (optional)
+          required: false
