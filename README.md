@@ -4,6 +4,44 @@
 
 > **Status:** Early development (v0.1). Not security-audited. Use at your own risk for non-production or personal workflows.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/assets/screenshots/register_step_1.png" alt="Registration — create account" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/register_step_2.png" alt="Registration — unlock setup" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/register_provisioning_running.png" alt="Provisioning vault" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/register_provisioning_complete.png" alt="Vault ready" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/dashboard.png" alt="Dashboard" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/vault.png" alt="Secrets vault" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/buckets.png" alt="App buckets" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/bucket_detail.png" alt="Bucket env mappings" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshots/approvals.png" alt="Client approvals" width="720" />
+</p>
+
 ## Features (current)
 
 - Encrypted vault (**SQLCipher**) at `~/.argus/argus.db`
