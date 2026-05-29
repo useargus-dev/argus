@@ -156,10 +156,21 @@ fn should_run_in_background(app: &tauri::AppHandle) -> bool {
 }
 
 fn show_requests_window(app: &tauri::AppHandle) {
-    use tauri::Manager;
+    use tauri::{Manager, UserAttentionType};
+
     if let Some(w) = app.get_webview_window("requests") {
-        let _ = w.show();
-        let _ = w.set_focus();
+        let app = app.clone();
+        let _ = w.run_on_main_thread(move || {
+            if let Some(w) = app.get_webview_window("requests") {
+                if w.is_minimized().unwrap_or(false) {
+                    let _ = w.unminimize();
+                }
+                let _ = w.show();
+                let _ = w.set_always_on_top(true);
+                let _ = w.set_focus();
+                let _ = w.request_user_attention(Some(UserAttentionType::Informational));
+            }
+        });
     } else {
         let width = 400.0_f64;
         let height = 480.0_f64;
