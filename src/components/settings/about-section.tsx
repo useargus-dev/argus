@@ -3,7 +3,7 @@ import { Info } from "lucide-react";
 import { SettingsRow } from "./settings-row";
 import { SettingsSection } from "./settings-section";
 
-const VERSION = "0.1.0-prototype";
+const VERSION = "0.1.1";
 const LICENSE = "Apache-2.0";
 
 export function AboutSection() {

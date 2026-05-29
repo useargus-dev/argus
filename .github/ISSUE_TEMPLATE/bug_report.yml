@@ -13,8 +13,8 @@ body:
     id: version
     attributes:
       label: Argus version
-      description: e.g. 0.1.0, or commit SHA from About / `git rev-parse HEAD`
-      placeholder: "0.1.0"
+      description: e.g. 0.1.1, or commit SHA from About / `git rev-parse HEAD`
+      placeholder: "0.1.1"
     validations:
       required: true
 
