@@ -16,7 +16,9 @@
 - **Approvals page** — view and revoke all active/expired client grants from the main app sidebar; works even while app is locked (vault and buckets UI require unlock)
 - **System tray** — left-click opens requests window (if signed in); hide on close; IPC server runs while signed in
 
-**Planned:** packaged client libraries wrapping IPC. Test with `pnpm ipc:test`. See [docs/architecture.md](docs/architecture.md) §11.
+**Client libraries:** [Node.js `@useargus/node`](https://www.npmjs.com/package/@useargus/node) ([source](https://github.com/useargus-dev/node-argus)) and [Python `useargus`](https://pypi.org/project/useargus/) ([source](https://github.com/useargus-dev/py-argus)) are published. Go, Ruby, and Java SDKs are in development. See [docs/architecture.md](docs/architecture.md) §16.
+
+Test IPC without a library: `pnpm ipc:test` (see [docs/architecture.md](docs/architecture.md) §11).
 
 ## Quick start
 
@@ -57,6 +59,8 @@ Never commit real bucket IDs, tokens, or database files.
 | [docs/build-deps.md](docs/build-deps.md)     | SQLCipher / platform build setup    |
 | [docs/design.md](docs/design.md)             | UI screens and flows                |
 | [docs/plan.md](docs/plan.md)                 | Development roadmap (aspirational)  |
+| [@useargus/node](https://www.npmjs.com/package/@useargus/node) | Node.js SDK (`loadEnv`) — [source](https://github.com/useargus-dev/node-argus) |
+| [useargus](https://pypi.org/project/useargus/) | Python SDK (`load_env`) — [source](https://github.com/useargus-dev/py-argus) |
 
 ## Security
 
@@ -80,7 +84,7 @@ Argus depends on open-source libraries (React, Tauri, SQLCipher, etc.) under the
 | View, fork, and modify the source                                          | Offer a **hosted/SaaS** service without AGPL source compliance |
 | Distribute changes **if** you comply with AGPL (source available to users) | Resell a proprietary derivative without open-sourcing it       |
 
-A **self-hosted system** is on the roadmap. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for other commercial licensing inquiries.
+Team servers and cloud sync are **out of scope** for the current desktop app. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for uses that need a separate commercial license.
 
 The **Argus** name and logo are not covered by AGPL — do not imply endorsement for competing products.
 

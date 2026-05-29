@@ -3,7 +3,7 @@
 > This document is the authoritative security specification for Argus.  
 > It defines threats, controls, cryptographic parameters, and release checklists.  
 > Researchers: start with [SECURITY.md](../SECURITY.md) at the repository root.  
-> **IPC / client grants / socket server** are **shipped** on desktop (v0.1): local socket/pipe, OS-verified fingerprint, grant table, requests popup window, approvals page. Client libraries (Python/Node) remain **planned**.
+> **IPC / client grants / socket server** are **shipped** on desktop (v0.1): local socket/pipe, OS-verified fingerprint, grant table, requests popup window, approvals page. **Node.js and Python client libraries** are **published**; Go, Ruby, and Java SDKs remain **in development**.
 
 **Related:** [architecture.md](./architecture.md) · [plan.md](./plan.md)
 

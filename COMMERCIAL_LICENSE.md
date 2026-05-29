@@ -4,19 +4,19 @@ The Argus **community desktop** edition in this repository is free software unde
 
 A **separate commercial license** is available for uses that are not compatible with AGPL-3.0, or for organizations that want proprietary terms or dedicated support.
 
-A **self-hosted system** is on the roadmap and is not available yet.
+The current product is the **desktop community edition** only. Team servers and centralized deployment are **not** offered as of now (see [architecture.md](docs/architecture.md) non-goals).
 
 ## When you may need a commercial license
 
 Examples (not legal advice — contact us for your situation):
 
-| Use case | Community (AGPL-3.0) | Commercial license |
-|----------|----------------------|-------------------|
-| Personal or freelance use on your own machine | Typically yes | Optional |
-| Internal use at a company (desktop, not redistributed) | Typically yes | Optional |
-| Modify and **distribute** the app without publishing source under AGPL | No | **Required** |
-| Ship Argus (or a derivative) inside a **closed-source** product | No | **Required** |
-| Offer Argus as a **managed/hosted** service without AGPL compliance | No | **Required** |
+| Use case                                                               | Community (AGPL-3.0) | Commercial license |
+| ---------------------------------------------------------------------- | -------------------- | ------------------ |
+| Personal or freelance use on your own machine                          | Typically yes        | Optional           |
+| Internal use at a company (desktop, not redistributed)                 | Typically yes        | Optional           |
+| Modify and **distribute** the app without publishing source under AGPL | No                   | **Required**       |
+| Ship Argus (or a derivative) inside a **closed-source** product        | No                   | **Required**       |
+| Offer Argus as a **managed/hosted** service without AGPL compliance    | No                   | **Required**       |
 
 ## What the commercial license provides (typical)
 
