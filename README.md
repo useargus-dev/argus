@@ -16,7 +16,7 @@
 - **Approvals page** — view and revoke all active/expired client grants from the main app sidebar; works even while app is locked (vault and buckets UI require unlock)
 - **System tray** — left-click opens requests window (if signed in); hide on close; IPC server runs while signed in
 
-**Client libraries:** [Node.js `@useargus/node`](https://www.npmjs.com/package/@useargus/node) is available on npm. Python, Go, Ruby, and Java SDKs are in development. See [docs/architecture.md](docs/architecture.md) §16 and the [node-argus](https://github.com/useargus-dev/node-argus) repository.
+**Client libraries:** [Node.js `@useargus/node`](https://www.npmjs.com/package/@useargus/node) ([source](https://github.com/useargus-dev/node-argus)) and [Python `useargus`](https://pypi.org/project/useargus/) ([source](https://github.com/useargus-dev/py-argus)) are published. Go, Ruby, and Java SDKs are in development. See [docs/architecture.md](docs/architecture.md) §16.
 
 Test IPC without a library: `pnpm ipc:test` (see [docs/architecture.md](docs/architecture.md) §11).
 
@@ -60,6 +60,7 @@ Never commit real bucket IDs, tokens, or database files.
 | [docs/design.md](docs/design.md)             | UI screens and flows                |
 | [docs/plan.md](docs/plan.md)                 | Development roadmap (aspirational)  |
 | [@useargus/node](https://www.npmjs.com/package/@useargus/node) | Node.js SDK (`loadEnv`) — [source](https://github.com/useargus-dev/node-argus) |
+| [useargus](https://pypi.org/project/useargus/) | Python SDK (`load_env`) — [source](https://github.com/useargus-dev/py-argus) |
 
 ## Security
 

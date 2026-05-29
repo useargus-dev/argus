@@ -29,6 +29,6 @@ Older docs may mention separate “elevate vault/buckets” steps; that was simp
 
 - Read [security.md](./security.md) § Known limitations.
 - **IPC** (socket/pipe, advanced fingerprint, grants, requests popup window) and **tray** (hide-on-close, left-click opens requests) are **shipped**.
-- **Client libraries:** **Node.js** [`@useargus/node`](https://www.npmjs.com/package/@useargus/node) is published ([source](https://github.com/useargus-dev/node-argus)). Python, Go, Ruby, and Java are **in development** — see [architecture.md](./architecture.md) §16. Test IPC with `pnpm ipc:test` (`scripts/ipc-request.ts`).
+- **Client libraries:** **Node.js** [`@useargus/node`](https://www.npmjs.com/package/@useargus/node) ([source](https://github.com/useargus-dev/node-argus)) and **Python** [`useargus`](https://pypi.org/project/useargus/) ([source](https://github.com/useargus-dev/py-argus)) are published. Go, Ruby, and Java are **in development** — see [architecture.md](./architecture.md) §16. Test IPC with `pnpm ipc:test` (`scripts/ipc-request.ts`).
 - **Approvals page** in main app sidebar — view and revoke all client grants (works while app is locked; vault/buckets UI require unlock).
 - **Licensing:** community code is [AGPL-3.0](../LICENSE). Team servers and cloud sync are out of scope — see [architecture.md](./architecture.md). Other commercial licensing uses [COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md).

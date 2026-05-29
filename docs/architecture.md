@@ -3,7 +3,7 @@
 > **Argus** is a local-first secrets vault and approval gateway for developer environments.  
 > One encrypted database. One OS user. Zero cloud. Secrets leave the machine only when a human approves a specific process identity.
 
-> **Implementation note:** **IPC** (local socket/pipe + OS-verified fingerprint + grants + requests popup window + approvals page) and **tray** (hide-on-close, left-click opens requests) are **shipped** on desktop. **Python/Node client libraries** and advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
+> **Implementation note:** **IPC** (local socket/pipe + OS-verified fingerprint + grants + requests popup window + approvals page) and **tray** (hide-on-close, left-click opens requests) are **shipped** on desktop. **Node.js and Python client libraries** are **published**; Go, Ruby, and Java SDKs remain **in development**. Advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
 
 **Related documents:** [plan.md](./plan.md) · [design.md](./design.md) · [security.md](./security.md)
 
@@ -136,7 +136,7 @@ References: [Tauri Security Model](https://v2.tauri.app/security/), [Isolation P
                                │
          ┌─────────────────────┼─────────────────────┐
          ▼                     ▼                     ▼
-   argus-secrets-py     @argus-secrets/node      argus CLI
+   useargus              @useargus/node           argus CLI
 ```
 
 ### Layer responsibilities
@@ -773,7 +773,7 @@ Access matrix enforced in `ipc/handler.rs` and `commands/secrets.rs`.
 | Language | Package | Status |
 |---|---|---|
 | **Node.js** | [`@useargus/node`](https://www.npmjs.com/package/@useargus/node) — [node-argus](https://github.com/useargus-dev/node-argus) | **Shipped** — `loadEnv()` |
-| Python | `argus-secrets` (planned) | In development |
+| **Python** | [`useargus`](https://pypi.org/project/useargus/) — [py-argus](https://github.com/useargus-dev/py-argus) | **Shipped** — `load_env()` |
 | Go | `argus-go` (planned) | In development |
 | Ruby | `argus-secrets` gem (planned) | In development |
 | Java | JVM library (planned) | In development |
@@ -784,7 +784,8 @@ Access matrix enforced in `ipc/handler.rs` and `commands/secrets.rs`.
 argus-project/
 ├── argus/                 # Desktop app (this repo path)
 ├── node-argus/            # @useargus/node (published)
-├── clients/               # Future: python, go, ruby, java, cli
+├── py-argus/              # useargus on PyPI (published)
+├── clients/               # Future: go, ruby, java, cli
 └── docs/
 ```
 
