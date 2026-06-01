@@ -7,6 +7,10 @@ use uuid::Uuid;
 
 use crate::crypto::encryption::{decrypt_value, encrypt_value};
 use crate::error::{AppError, AppResult};
+use crate::user_messages;
+
+pub const PROXY_PORT_MIN: u16 = 9000;
+pub const PROXY_PORT_MAX: u16 = 9100;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +24,8 @@ pub struct BucketMeta {
     pub session_ttl_minutes: i64,
     pub mapping_count: u32,
     pub active_grant_count: u32,
+    pub proxy_enabled: bool,
+    pub proxy_port: Option<u16>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -30,6 +36,13 @@ pub struct BucketWithToken {
     #[serde(flatten)]
     pub meta: BucketMeta,
     pub token: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct BucketProxyRow {
+    pub id: String,
+    pub proxy_enabled: bool,
+    pub proxy_port: Option<u16>,
 }
 
 const TOKEN_LEN: usize = 32;
@@ -71,8 +84,10 @@ fn row_to_meta(row: &rusqlite::Row<'_>) -> rusqlite::Result<BucketMeta> {
         session_ttl_minutes: row.get(6)?,
         mapping_count: row.get(7)?,
         active_grant_count: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
+        proxy_enabled: row.get::<_, i64>(9)? != 0,
+        proxy_port: row.get::<_, Option<i64>>(10)?.map(|p| p as u16),
+        created_at: row.get(11)?,
+        updated_at: row.get(12)?,
     })
 }
 
@@ -82,6 +97,7 @@ SELECT b.id, b.name, b.description, b.is_tray_active,
        (SELECT COUNT(*) FROM bucket_mappings m WHERE m.bucket_id = b.id),
        (SELECT COUNT(*) FROM client_grants g
         WHERE g.bucket_id = b.id AND g.expires_at > datetime('now')),
+       b.proxy_enabled, b.proxy_port,
        b.created_at, b.updated_at
 FROM app_buckets b
 ORDER BY b.updated_at DESC
@@ -104,14 +120,50 @@ SELECT b.id, b.name, b.description, b.is_tray_active,
        (SELECT COUNT(*) FROM bucket_mappings m WHERE m.bucket_id = b.id),
        (SELECT COUNT(*) FROM client_grants g
         WHERE g.bucket_id = b.id AND g.expires_at > datetime('now')),
+       b.proxy_enabled, b.proxy_port,
        b.created_at, b.updated_at
 FROM app_buckets b
 WHERE b.id = ?1
 ";
 
 pub fn get_bucket_meta(conn: &Connection, id: &str) -> AppResult<BucketMeta> {
-    conn.query_row(META_SELECT, [id], row_to_meta)
-        .map_err(|_| AppError::message("NOT_FOUND", "bucket not found"))
+    conn.query_row(META_SELECT, [id], row_to_meta).map_err(|_| {
+        AppError::message("BUCKET_NOT_FOUND", user_messages::bucket_not_found(id))
+    })
+}
+
+pub fn get_bucket_proxy_row(conn: &Connection, id: &str) -> AppResult<BucketProxyRow> {
+    conn.query_row(
+        "SELECT id, proxy_enabled, proxy_port FROM app_buckets WHERE id = ?1",
+        [id],
+        |r| {
+            Ok(BucketProxyRow {
+                id: r.get(0)?,
+                proxy_enabled: r.get::<_, i64>(1)? != 0,
+                proxy_port: r.get::<_, Option<i64>>(2)?.map(|p| p as u16),
+            })
+        },
+    )
+    .map_err(|_| {
+        AppError::message("BUCKET_NOT_FOUND", user_messages::bucket_not_found(id))
+    })
+}
+
+pub fn list_proxy_enabled_buckets(conn: &Connection) -> AppResult<Vec<(String, u16)>> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, proxy_port FROM app_buckets WHERE proxy_enabled = 1 AND proxy_port IS NOT NULL",
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    let rows = stmt
+        .query_map([], |r| {
+            let id: String = r.get(0)?;
+            let port: i64 = r.get(1)?;
+            Ok((id, port as u16))
+        })
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))
 }
 
 fn persist_token(
@@ -128,6 +180,62 @@ fn persist_token(
     )
     .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
     Ok(())
+}
+
+pub fn allocate_proxy_port(conn: &Connection, bucket_id: &str) -> AppResult<u16> {
+    let used: Vec<i64> = conn
+        .prepare("SELECT proxy_port FROM app_buckets WHERE proxy_port IS NOT NULL AND id != ?1")
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?
+        .query_map([bucket_id], |r| r.get(0))
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for port in PROXY_PORT_MIN..=PROXY_PORT_MAX {
+        if !used.contains(&(port as i64)) {
+            return Ok(port);
+        }
+    }
+    Err(AppError::message(
+        "PROXY_PORT_EXHAUSTED",
+        "no free proxy ports in range 9000-9100",
+    ))
+}
+
+pub fn set_bucket_proxy_enabled(
+    conn: &Connection,
+    bucket_id: &str,
+    enabled: bool,
+) -> AppResult<BucketMeta> {
+    let _ = get_bucket_meta(conn, bucket_id)?;
+    let now = Utc::now().to_rfc3339();
+
+    if enabled {
+        let existing_port: Option<i64> = conn
+            .query_row(
+                "SELECT proxy_port FROM app_buckets WHERE id = ?1",
+                [bucket_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(None);
+        let port = match existing_port {
+            Some(p) => p as u16,
+            None => allocate_proxy_port(conn, bucket_id)?,
+        };
+        conn.execute(
+            "UPDATE app_buckets SET proxy_enabled = 1, proxy_port = ?2, updated_at = ?3 WHERE id = ?1",
+            params![bucket_id, port as i64, now],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    } else {
+        conn.execute(
+            "UPDATE app_buckets SET proxy_enabled = 0, updated_at = ?2 WHERE id = ?1",
+            params![bucket_id, now],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
+
+    get_bucket_meta(conn, bucket_id)
 }
 
 pub fn create_bucket(
@@ -150,8 +258,8 @@ pub fn create_bucket(
     conn.execute(
         "INSERT INTO app_buckets (id, name, description, client_token_hash, client_token_enc,
          access_ttl_minutes, refresh_ttl_minutes, session_ttl_minutes, is_tray_active,
-         created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, 60, NULL, 480, 1, ?6, ?6)",
+         proxy_enabled, allowed_hosts, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, 60, NULL, 480, 1, 0, '[]', ?6, ?6)",
         params![id, trimmed, description, token_hash, token_enc, now],
     )
     .map_err(|e| {
@@ -171,7 +279,10 @@ pub fn delete_bucket(conn: &Connection, id: &str) -> AppResult<()> {
         .execute("DELETE FROM app_buckets WHERE id = ?1", [id])
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
     if n == 0 {
-        return Err(AppError::message("NOT_FOUND", "bucket not found"));
+        return Err(AppError::message(
+            "BUCKET_NOT_FOUND",
+            user_messages::bucket_not_found(id),
+        ));
     }
     Ok(())
 }
@@ -206,7 +317,7 @@ pub fn verify_client_token(
     if !meta.is_active {
         return Err(AppError::message(
             "BUCKET_INACTIVE",
-            "bucket is not active",
+            user_messages::bucket_inactive(&meta.name),
         ));
     }
     let expected: String = conn
@@ -215,15 +326,31 @@ pub fn verify_client_token(
             [bucket_id],
             |r| r.get(0),
         )
-        .map_err(|_| AppError::message("NOT_FOUND", "bucket not found"))?;
+        .map_err(|_| {
+            AppError::message("BUCKET_NOT_FOUND", user_messages::bucket_not_found(bucket_id))
+        })?;
     let got = hash_token(client_token);
     if got != expected {
         return Err(AppError::message(
             "INVALID_TOKEN",
-            "invalid client token",
+            user_messages::invalid_token(&meta.name),
         ));
     }
     Ok(meta)
+}
+
+pub fn verify_token_hash(conn: &Connection, client_token: &str) -> AppResult<String> {
+    let hash = hash_token(client_token);
+    let bucket_id: Option<String> = conn
+        .query_row(
+            "SELECT id FROM app_buckets WHERE client_token_hash = ?1",
+            [&hash],
+            |r| r.get(0),
+        )
+        .ok();
+    bucket_id.ok_or_else(|| {
+        AppError::message("INVALID_TOKEN", user_messages::invalid_token_generic())
+    })
 }
 
 pub fn get_bucket_token(
@@ -237,7 +364,9 @@ pub fn get_bucket_token(
             [id],
             |r| r.get(0),
         )
-        .map_err(|_| AppError::message("NOT_FOUND", "bucket not found"))?;
+        .map_err(|_| {
+        AppError::message("BUCKET_NOT_FOUND", user_messages::bucket_not_found(id))
+    })?;
     let enc = enc.ok_or_else(|| {
         AppError::message(
             "TOKEN_UNAVAILABLE",

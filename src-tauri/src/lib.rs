@@ -3,9 +3,11 @@ pub mod crypto;
 pub mod db;
 mod error;
 mod ipc;
+mod proxy;
 mod register;
 mod sessions;
 mod state;
+mod user_messages;
 mod util;
 
 use state::AppState;
@@ -20,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
         .manage(ipc::IpcRuntime::default())
+        .manage(proxy::ProxyRuntime::default())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -114,6 +117,7 @@ pub fn run() {
             commands::buckets::create_bucket,
             commands::buckets::delete_bucket,
             commands::buckets::set_bucket_active,
+            commands::buckets::set_bucket_proxy_enabled,
             commands::buckets::get_bucket_token,
             commands::buckets::list_bucket_mappings,
             commands::buckets::upsert_bucket_mapping,

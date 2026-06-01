@@ -12,15 +12,29 @@ pub struct IpcRequest {
     pub cwd: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyConfigPayload {
+    pub enabled: bool,
+    pub http_proxy: String,
+    pub https_proxy: String,
+    pub no_proxy: String,
+    pub ca_bundle_path: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
 pub enum IpcResponse {
     Ok {
         request_id: String,
         env: HashMap<String, String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        proxy: Option<ProxyConfigPayload>,
     },
     Denied {
         request_id: String,
+        /// `APPROVAL_DENIED` or `APPROVAL_TIMEOUT`
+        code: String,
         message: String,
     },
     Locked {

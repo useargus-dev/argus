@@ -1,9 +1,10 @@
 use serde::Deserialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::db::bucket_mappings::{self, BucketMapping};
 use crate::db::buckets::{self, BucketMeta, BucketWithToken};
 use crate::error::{AppError, AppResult};
+use crate::proxy::ProxyRuntime;
 use crate::state::AppState;
 use crate::util::session;
 
@@ -22,6 +23,10 @@ pub struct UpsertMappingRequest {
     pub mapping_type: String,
     pub secret_id: Option<String>,
     pub text_value: Option<String>,
+    #[serde(default)]
+    pub proxy_enabled: bool,
+    #[serde(default)]
+    pub allowed_hosts: Vec<String>,
 }
 
 fn require_buckets(inner: &crate::state::AppStateInner) -> AppResult<()> {
@@ -30,6 +35,21 @@ fn require_buckets(inner: &crate::state::AppStateInner) -> AppResult<()> {
             "APP_LOCKED",
             "unlock the app to manage buckets",
         ));
+    }
+    Ok(())
+}
+
+fn sync_proxy_listener(app: &AppHandle, conn: &rusqlite::Connection, bucket_id: &str) -> AppResult<()> {
+    let row = buckets::get_bucket_proxy_row(conn, bucket_id)?;
+    let proxy = app.state::<ProxyRuntime>();
+    if row.proxy_enabled {
+        if let Some(port) = row.proxy_port {
+            proxy
+                .start_bucket(app, bucket_id, port)
+                .map_err(|e| AppError::message("PROXY_ERROR", e))?;
+        }
+    } else {
+        proxy.stop_bucket(bucket_id);
     }
     Ok(())
 }
@@ -82,6 +102,8 @@ pub fn delete_bucket(
 ) -> Result<(), String> {
     session::touch_and_check_auto_lock(&app, &state, true).map_err(|e| String::from(e))?;
 
+    app.state::<ProxyRuntime>().stop_bucket(&id);
+
     session::with_db(&state, |conn, inner| {
         session::sync_scopes(&app, inner);
         require_buckets(inner)?;
@@ -108,6 +130,30 @@ pub fn set_bucket_active(
         buckets::set_bucket_active(conn, &vk, &id, active).map_err(|e| e.into())
     })
     .map_err(|e| String::from(e))
+}
+
+#[tauri::command]
+pub fn set_bucket_proxy_enabled(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    enabled: bool,
+) -> Result<BucketMeta, String> {
+    session::touch_and_check_auto_lock(&app, &state, true).map_err(|e| String::from(e))?;
+
+    let meta = session::with_db(&state, |conn, inner| {
+        session::sync_scopes(&app, inner);
+        require_buckets(inner)?;
+        buckets::set_bucket_proxy_enabled(conn, &id, enabled).map_err(|e| e.into())
+    })
+    .map_err(|e| String::from(e))?;
+
+    session::with_db(&state, |conn, _inner| {
+        sync_proxy_listener(&app, conn, &id).map_err(|e| e.into())
+    })
+    .map_err(|e| String::from(e))?;
+
+    Ok(meta)
 }
 
 #[tauri::command]
@@ -150,6 +196,8 @@ pub fn upsert_bucket_mapping(
             &req.mapping_type,
             req.secret_id.as_deref(),
             req.text_value.as_deref(),
+            req.proxy_enabled,
+            &req.allowed_hosts,
             &vk,
         )
         .map_err(|e| e.into())

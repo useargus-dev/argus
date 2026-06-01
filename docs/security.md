@@ -70,7 +70,7 @@
 | ---------------------------------------------------- | -------------------------------------------------- |
 | **O1** Root / kernel attacker                        | Can dump process memory of unlocked Argus          |
 | **O2** User approves malicious binary                | User must read `process_path` — social engineering |
-| **O3** Malware after env injection                   | Client app holds secrets in `os.environ`           |
+| **O3** Malware after env injection                   | Mitigated for **proxy-enabled** mappings (placeholders only); non-proxy mappings and `.env` overrides still expose values in `os.environ` |
 | **O4** Physical forensic disk imaging while unlocked | Memory keys exist while running                    |
 | **O5** Nation-state hardware implants                | —                                                  |
 | **O6** Coerced user unlocks vault                    | —                                                  |
@@ -653,6 +653,8 @@ Report via **[SECURITY.md](../SECURITY.md)** (GitHub Security Advisories). Do no
 | Append-only audit (full)                          | Partial / planned |
 | Screen lock integration                           | Planned           |
 | Type-based inject blocking (IPC)                  | Shipped           |
+| Per-bucket HTTP MITM proxy (9000–9100)            | Shipped           |
+| Proxy placeholders + host allowlist               | Shipped           |
 | Isolation pattern                                 | Recommended       |
 | OS keychain pepper                                | Future            |
 | Hardware security key                             | Future            |

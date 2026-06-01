@@ -8,6 +8,8 @@ export interface BucketMeta {
   sessionTtlMinutes: number;
   mappingCount: number;
   activeGrantCount: number;
+  proxyEnabled: boolean;
+  proxyPort: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +32,9 @@ export interface BucketMapping {
   secretName?: string | null;
   secretType?: string | null;
   textValue?: string | null;
+  proxyEnabled: boolean;
+  proxyPlaceholder: string | null;
+  allowedHosts: string[];
   createdAt: string;
 }
 
@@ -39,4 +44,6 @@ export interface UpsertMappingInput {
   mappingType: "secret" | "text";
   secretId?: string;
   textValue?: string;
+  proxyEnabled?: boolean;
+  allowedHosts?: string[];
 }

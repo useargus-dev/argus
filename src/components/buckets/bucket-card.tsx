@@ -77,9 +77,12 @@ export function BucketCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        <SecretBadge tone="accent">
-          {bucket.mappingCount} mappings
-        </SecretBadge>
+            <SecretBadge tone="accent">
+              {bucket.mappingCount} mappings
+            </SecretBadge>
+            {bucket.proxyEnabled && bucket.proxyPort != null && (
+              <SecretBadge tone="accent">Proxy :{bucket.proxyPort}</SecretBadge>
+            )}
         {bucket.activeGrantCount > 0 && (
           <SecretBadge tone="success">
             {bucket.activeGrantCount} active

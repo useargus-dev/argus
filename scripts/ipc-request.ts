@@ -176,11 +176,12 @@ async function main(): Promise<number> {
   }
 
   if (resp.status === "locked") {
-    console.error("Argus is locked or signed out — unlock the app and retry.");
+    console.error(resp.message ?? "Argus is not signed in — sign in and retry.");
   } else if (resp.status === "denied") {
-    console.error("Access denied (or approval timed out).");
+    const code = resp.code ?? "APPROVAL_DENIED";
+    console.error(`[${code}] ${resp.message ?? "Access denied."}`);
   } else if (resp.status === "error") {
-    console.error(`error ${resp.code ?? "?"}: ${resp.message ?? "unknown"}`);
+    console.error(`[${resp.code ?? "IPC_ERROR"}] ${resp.message ?? "unknown"}`);
   }
   return 1;
 }

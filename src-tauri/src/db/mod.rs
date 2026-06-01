@@ -1,6 +1,8 @@
+pub mod audit;
 pub mod bucket_mappings;
 pub mod buckets;
 pub mod client_grants;
+pub mod hosts;
 pub mod ipc_env;
 pub mod meta;
 pub mod secrets;

@@ -104,6 +104,8 @@ export const bridge = {
   deleteBucket: (id: string) => call<void>("delete_bucket", { id }),
   setBucketActive: (id: string, active: boolean) =>
     call<BucketWithToken>("set_bucket_active", { id, active }),
+  setBucketProxyEnabled: (id: string, enabled: boolean) =>
+    call<BucketMeta>("set_bucket_proxy_enabled", { id, enabled }),
   getBucketToken: (id: string) => call<string>("get_bucket_token", { id }),
   listBucketMappings: (bucketId: string) =>
     call<BucketMapping[]>("list_bucket_mappings", { bucketId }),

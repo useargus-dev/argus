@@ -1,11 +1,13 @@
 use std::collections::HashMap;
-
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::db::bucket_mappings;
+use crate::db::buckets;
 use crate::db::secrets;
 use crate::error::{AppError, AppResult};
+use crate::user_messages;
 
 pub fn is_socket_injectable(secret_type: &str) -> bool {
     matches!(
@@ -14,7 +16,7 @@ pub fn is_socket_injectable(secret_type: &str) -> bool {
     )
 }
 
-fn plain_from_value(value: &Value) -> AppResult<String> {
+pub fn plain_from_value(value: &Value) -> AppResult<String> {
     let obj = value
         .as_object()
         .ok_or_else(|| AppError::message("DB_ERROR", "invalid secret value"))?;
@@ -43,9 +45,17 @@ pub fn resolve_bucket_env(
     bucket_id: &str,
     value_key: &[u8; 32],
 ) -> AppResult<HashMap<String, String>> {
+    let bucket = buckets::get_bucket_meta(conn, bucket_id)?;
     let mappings = bucket_mappings::list_mappings(conn, bucket_id, value_key)?;
     let mut env = HashMap::new();
     for m in mappings {
+        let use_proxy = bucket.proxy_enabled && m.proxy_enabled;
+        if use_proxy {
+            if let Some(ph) = m.proxy_placeholder {
+                env.insert(m.env_label, ph);
+            }
+            continue;
+        }
         match m.mapping_type.as_str() {
             "text" => {
                 if let Some(val) = m.text_value {
@@ -71,4 +81,41 @@ pub fn resolve_bucket_env(
         }
     }
     Ok(env)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyConfig {
+    pub enabled: bool,
+    pub http_proxy: String,
+    pub https_proxy: String,
+    pub no_proxy: String,
+    pub ca_bundle_path: String,
+}
+
+pub fn resolve_proxy_config(
+    conn: &Connection,
+    bucket_id: &str,
+    client_token: &str,
+) -> AppResult<Option<ProxyConfig>> {
+    let meta = buckets::get_bucket_meta(conn, bucket_id)?;
+    if !meta.proxy_enabled {
+        return Ok(None);
+    }
+    let port = meta.proxy_port.ok_or_else(|| {
+        AppError::message("PROXY_ERROR", user_messages::proxy_port_missing(&meta.name))
+    })?;
+    let encoded = urlencoding::encode(client_token);
+    let base = format!("http://{encoded}@127.0.0.1:{port}");
+    let ca_bundle_path = crate::db::argus_dir()
+        .join("ca-bundle.pem")
+        .to_string_lossy()
+        .into_owned();
+    Ok(Some(ProxyConfig {
+        enabled: true,
+        http_proxy: base.clone(),
+        https_proxy: base,
+        no_proxy: "localhost,127.0.0.1,::1".to_string(),
+        ca_bundle_path,
+    }))
 }

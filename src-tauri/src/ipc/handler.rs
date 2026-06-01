@@ -6,8 +6,10 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::time::timeout;
 
 use crate::db::{buckets, client_grants, ipc_env};
+use crate::ipc::protocol::ProxyConfigPayload;
 use crate::error::AppError;
 use crate::ipc::peer::VerifiedClient;
+use crate::user_messages;
 use crate::ipc::protocol::{IpcRequest, IpcResponse};
 use crate::sessions::{ClientAccessRequestEvent, PendingApprovalStore, PendingDecision};
 use crate::state::AppState;
@@ -26,7 +28,7 @@ pub async fn handle_request(
             return IpcResponse::Error {
                 request_id: String::new(),
                 code: "INVALID_REQUEST".into(),
-                message: format!("invalid JSON: {e}"),
+                message: user_messages::invalid_request_json(&e.to_string()),
             }
             .to_line();
         }
@@ -53,7 +55,7 @@ pub async fn handle_request(
     if !signed_in {
         return IpcResponse::Locked {
             request_id,
-            message: "Argus is not signed in".into(),
+            message: user_messages::locked_signed_out().into(),
         }
         .to_line();
     }
@@ -99,7 +101,12 @@ async fn process_request(
 
     if let Some(env) = existing_env {
         touch_activity(state);
-        return Ok(IpcResponse::Ok { request_id, env });
+        let proxy = proxy_payload(state, &req.bucket_id, &req.client_token)?;
+        return Ok(IpcResponse::Ok {
+            request_id,
+            env,
+            proxy,
+        });
     }
 
     let event = ClientAccessRequestEvent {
@@ -130,7 +137,8 @@ async fn process_request(
             pending_store.respond(&request_id, PendingDecision::Deny);
             return Ok(IpcResponse::Denied {
                 request_id,
-                message: "approval timed out".into(),
+                code: "APPROVAL_TIMEOUT".into(),
+                message: user_messages::approval_timeout().into(),
             });
         }
     };
@@ -138,7 +146,8 @@ async fn process_request(
     match decision {
         PendingDecision::Deny => Ok(IpcResponse::Denied {
             request_id,
-            message: "access denied by user".into(),
+            code: "APPROVAL_DENIED".into(),
+            message: user_messages::approval_denied().into(),
         }),
         PendingDecision::Accept { ttl_minutes } => {
             let ttl = if ttl_minutes > 0 { ttl_minutes } else { access_ttl };
@@ -161,9 +170,31 @@ async fn process_request(
                 ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)
             })?;
             touch_activity(state);
-            Ok(IpcResponse::Ok { request_id, env })
+            let proxy = proxy_payload(state, &req.bucket_id, &req.client_token)?;
+            Ok(IpcResponse::Ok {
+                request_id,
+                env,
+                proxy,
+            })
         }
     }
+}
+
+fn proxy_payload(
+    state: &tauri::State<'_, AppState>,
+    bucket_id: &str,
+    client_token: &str,
+) -> Result<Option<ProxyConfigPayload>, AppError> {
+    with_session_db(state, |conn, _| {
+        let cfg = ipc_env::resolve_proxy_config(conn, bucket_id, client_token)?;
+        Ok(cfg.map(|c| ProxyConfigPayload {
+            enabled: c.enabled,
+            http_proxy: c.http_proxy,
+            https_proxy: c.https_proxy,
+            no_proxy: c.no_proxy,
+            ca_bundle_path: c.ca_bundle_path,
+        }))
+    })
 }
 
 fn with_session_db<T, F>(state: &tauri::State<'_, AppState>, f: F) -> Result<T, AppError>

@@ -10,6 +10,8 @@ interface BucketEnvCredentialsProps {
   cachedToken?: string | null;
   onTokenCached?: (token: string) => void;
   className?: string;
+  /** When true, omit the section heading (parent accordion provides it). */
+  embedded?: boolean;
 }
 
 /** Matches `TOKEN_LEN` in `src-tauri/src/db/buckets.rs`. */
@@ -26,6 +28,7 @@ export function BucketEnvCredentials({
   cachedToken,
   onTokenCached,
   className,
+  embedded = false,
 }: BucketEnvCredentialsProps) {
   const [revealed, setRevealed] = useState(false);
   const [token, setToken] = useState<string | null>(cachedToken ?? null);
@@ -87,9 +90,11 @@ export function BucketEnvCredentials({
 
   return (
     <div className={className}>
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-        Project .env
-      </div>
+      {!embedded && (
+        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+          Project .env
+        </div>
+      )}
       <div
         className={cn(
           "flex gap-2 rounded-md border border-border bg-surface-raised/60 px-3 py-2",

@@ -2,39 +2,113 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Package } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
-import { BucketEnvCredentials } from "../components/buckets/bucket-env-credentials";
-import { BucketMappingsPanel } from "../components/buckets/bucket-mappings-panel";
+import { BucketEnvAccordion } from "../components/buckets/bucket-env-accordion";
+import { BucketLayout } from "../components/buckets/bucket-layout";
+import { BucketProxySettings } from "../components/buckets/bucket-proxy-settings";
 import { SecretBadge } from "../components/secrets/secret-badge";
 import { bridge } from "../lib/tauri-bridge";
 import { toast } from "../lib/toast";
-import type { BucketMeta } from "../types/bucket";
+import type { BucketMapping, BucketMeta } from "../types/bucket";
+import type { SecretMeta } from "../types/secret";
 
 export function BucketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [bucket, setBucket] = useState<BucketMeta | null>(null);
+  const [mappings, setMappings] = useState<BucketMapping[]>([]);
+  const [secrets, setSecrets] = useState<SecretMeta[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftMode, setDraftMode] = useState(false);
   const [cachedToken, setCachedToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [mappingsLoading, setMappingsLoading] = useState(true);
 
-  const loadBucket = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      const list = await bridge.listBuckets();
-      const found = list.find((b) => b.id === id) ?? null;
-      setBucket(found);
-      if (!found) toast.error("Bucket not found");
-    } catch (e) {
-      toast.fromError(e, "Failed to load bucket");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const loadBucket = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!id) return;
+      if (!opts?.silent) setInitialLoading(true);
+      try {
+        const list = await bridge.listBuckets();
+        const found = list.find((b) => b.id === id) ?? null;
+        setBucket(found);
+        if (!found) toast.error("Bucket not found");
+      } catch (e) {
+        toast.fromError(e, "Failed to load bucket");
+      } finally {
+        if (!opts?.silent) setInitialLoading(false);
+      }
+    },
+    [id],
+  );
+
+  const loadMappings = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!id) return;
+      if (!opts?.silent) setMappingsLoading(true);
+      try {
+        const [mapList, secretList] = await Promise.all([
+          bridge.listBucketMappings(id),
+          bridge.searchSecrets(),
+        ]);
+        setMappings(mapList);
+        setSecrets(secretList);
+      } catch (e) {
+        toast.fromError(e, "Failed to load mappings");
+      } finally {
+        if (!opts?.silent) setMappingsLoading(false);
+      }
+    },
+    [id],
+  );
+
+  const handleMappingSaved = useCallback((saved: BucketMapping) => {
+    setDraftMode(false);
+    setSelectedId(saved.id);
+    setMappings((prev) => {
+      const byId = prev.findIndex((m) => m.id === saved.id);
+      const byEnv = prev.findIndex((m) => m.envLabel === saved.envLabel);
+      const idx = byId >= 0 ? byId : byEnv;
+      let next: BucketMapping[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = saved;
+      } else {
+        next = [...prev, saved].sort((a, b) =>
+          a.envLabel.localeCompare(b.envLabel, undefined, { sensitivity: "base" }),
+        );
+      }
+      setBucket((b) => (b ? { ...b, mappingCount: next.length } : b));
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     void loadBucket();
-  }, [loadBucket]);
+    void loadMappings();
+  }, [loadBucket, loadMappings]);
 
-  if (loading) {
+  useEffect(() => {
+    if (mappings.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId && !draftMode) {
+      setSelectedId(mappings[0]?.id ?? null);
+    }
+  }, [mappings, selectedId, draftMode]);
+
+  async function handleDeleteMapping(mappingId: string) {
+    if (!confirm("Delete this mapping?")) return;
+    try {
+      await bridge.deleteBucketMapping(mappingId);
+      if (selectedId === mappingId) setSelectedId(null);
+      await loadMappings({ silent: true });
+      await loadBucket({ silent: true });
+    } catch (e) {
+      toast.fromError(e, "Failed to delete mapping");
+    }
+  }
+
+  if (initialLoading && !bucket) {
     return <p className="text-sm text-text-muted">Loading bucket…</p>;
   }
 
@@ -76,26 +150,45 @@ export function BucketDetailPage() {
             <SecretBadge tone={bucket.isActive ? "success" : "muted"}>
               {bucket.isActive ? "Active" : "Inactive"}
             </SecretBadge>
-            <SecretBadge tone="accent">
-              {bucket.mappingCount} mappings
-            </SecretBadge>
+            <SecretBadge tone="accent">{bucket.mappingCount} mappings</SecretBadge>
+            {bucket.proxyEnabled && bucket.proxyPort != null && (
+              <SecretBadge tone="accent">Proxy :{bucket.proxyPort}</SecretBadge>
+            )}
             <SecretBadge>TTL {bucket.accessTtlMinutes}m</SecretBadge>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-border bg-surface p-5">
-        <BucketEnvCredentials
+      <div className="mt-6 space-y-4">
+        <BucketProxySettings bucket={bucket} onBucketChange={setBucket} />
+
+        <BucketEnvAccordion
           bucketId={bucket.id}
           cachedToken={cachedToken}
           onTokenCached={setCachedToken}
         />
-      </div>
 
-      <BucketMappingsPanel
-        bucketId={id}
-        onMappingsChange={loadBucket}
-      />
+        <BucketLayout
+          bucketId={id}
+          mappings={mappings}
+          secrets={secrets}
+          selectedId={selectedId}
+          draftMode={draftMode}
+          proxyBucketEnabled={bucket.proxyEnabled}
+          loading={mappingsLoading}
+          onSelect={(mid) => {
+            setDraftMode(false);
+            setSelectedId(mid);
+          }}
+          onAdd={() => {
+            setDraftMode(true);
+            setSelectedId(null);
+          }}
+          onDelete={(mid) => void handleDeleteMapping(mid)}
+          onSaved={handleMappingSaved}
+          onCancelDraft={() => setDraftMode(false)}
+        />
+      </div>
     </div>
   );
 }

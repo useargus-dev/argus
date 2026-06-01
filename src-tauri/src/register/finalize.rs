@@ -121,6 +121,7 @@ fn finalize_inner(
                 };
                 let _ = app.emit("scope-changed", scopes);
                 crate::ipc::start_for_app(app);
+                crate::proxy::start_for_app(app);
             }
             _ => {}
         }
