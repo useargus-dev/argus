@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { ScopeStatus, UserProfile } from "../types/auth";
+import type { ScopeStatus, UserProfile } from "@/shared/types/auth";
 
 interface AuthState {
   isSignedIn: boolean;

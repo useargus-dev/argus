@@ -1,7 +1,7 @@
 use tauri::AppHandle;
 
 use crate::crypto::{decrypt_totp_secret, verify_totp_code};
-use crate::db::meta;
+use crate::infra::db::meta;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::util::biometry;

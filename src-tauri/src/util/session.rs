@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use rusqlite::Connection;
 use tauri::{AppHandle, Emitter};
 
-use crate::db::settings;
+use crate::infra::db::settings;
 use crate::error::{AppError, AppResult};
 use crate::state::{now_epoch, AppState, AppStateInner, ScopeStatus};
 

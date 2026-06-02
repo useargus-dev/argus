@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use zeroize::Zeroizing;
 
 use crate::crypto::{derive_keys, encrypt_totp_secret};
-use crate::db::{self, meta, users};
+use crate::infra::db::{self, meta, users};
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, RegisterDraft};
 use crate::util::trace::AuthTimer;

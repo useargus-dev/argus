@@ -5,11 +5,11 @@ use chrono::Utc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::time::timeout;
 
-use crate::db::{buckets, client_grants, ipc_env};
+use crate::infra::db::{buckets, client_grants, ipc_env};
 use crate::ipc::protocol::ProxyConfigPayload;
 use crate::error::AppError;
 use crate::ipc::peer::VerifiedClient;
-use crate::user_messages;
+use crate::messages;
 use crate::ipc::protocol::{IpcRequest, IpcResponse};
 use crate::sessions::{ClientAccessRequestEvent, PendingApprovalStore, PendingDecision};
 use crate::state::AppState;
@@ -28,7 +28,7 @@ pub async fn handle_request(
             return IpcResponse::Error {
                 request_id: String::new(),
                 code: "INVALID_REQUEST".into(),
-                message: user_messages::invalid_request_json(&e.to_string()),
+                message: messages::invalid_request_json(&e.to_string()),
             }
             .to_line();
         }
@@ -55,7 +55,7 @@ pub async fn handle_request(
     if !signed_in {
         return IpcResponse::Locked {
             request_id,
-            message: user_messages::locked_signed_out().into(),
+            message: messages::locked_signed_out().into(),
         }
         .to_line();
     }
@@ -138,7 +138,7 @@ async fn process_request(
             return Ok(IpcResponse::Denied {
                 request_id,
                 code: "APPROVAL_TIMEOUT".into(),
-                message: user_messages::approval_timeout().into(),
+                message: messages::approval_timeout().into(),
             });
         }
     };
@@ -147,7 +147,7 @@ async fn process_request(
         PendingDecision::Deny => Ok(IpcResponse::Denied {
             request_id,
             code: "APPROVAL_DENIED".into(),
-            message: user_messages::approval_denied().into(),
+            message: messages::approval_denied().into(),
         }),
         PendingDecision::Accept { ttl_minutes } => {
             let ttl = if ttl_minutes > 0 { ttl_minutes } else { access_ttl };

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { SecondFactorType, TotpSetup } from "../types/auth";
+import type { SecondFactorType, TotpSetup } from "@/shared/types/auth";
 
 export type RegisterStep = 1 | 2;
 

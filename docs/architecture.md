@@ -611,14 +611,13 @@ Lookup client_grants WHERE bucket_id + fingerprint + token_hash
 When **Enable proxy** is on for a bucket:
 
 - Argus binds `127.0.0.1:<port>` where port is allocated from **9000–9100** and stored on `app_buckets.proxy_port`.
-- IPC `ok` responses may include a `proxy` object with `httpProxy`, `httpsProxy`, `noProxy`, and `caBundlePath` (`~/.argus/ca-bundle.pem`). Client libraries (`useargus`, `@useargus/node`) set `HTTP_PROXY`, `HTTPS_PROXY`, and CA env vars.
+- IPC `ok` responses may include a `proxy` object with `httpProxy`, `httpsProxy`, `noProxy`, and `caBundlePath` (`~/.argus/ca-bundle.pem`). SDKs wire this into **explicit per-client** proxy/CA settings (not global env patches).
 - Mappings with **proxy enabled** receive `argus-proxy-*` placeholders in `env`, never real secrets.
 - Each proxy-enabled mapping has its own `allowed_hosts` (suffix match). Requests to hosts not allowed by any active mapping receive **403**; MITM rewrite applies only for mappings that allow the request host.
-- On `CONNECT`, the proxy validates `Proxy-Authorization` (client token) and an active `client_grants` row (same TTL / approval flow as IPC).
+- On `CONNECT`, the proxy validates `Proxy-Authorization` (client token), an active `client_grants` row **for the connecting process fingerprint**, and OS-verified peer PID (Linux/macOS/Windows TCP table).
 - MITM TLS uses a local Argus CA; leaf certs are issued per destination host.
-- Header rewrite: any header value matching a bucket placeholder is replaced with the real secret before forwarding upstream.
+- Header and UTF-8 body rewrite: placeholder substrings are replaced with real secrets before forwarding upstream.
 - Audit events: `PROXY_REQUEST`, `PROXY_HOST_DENIED`, `PROXY_GRANT_DENIED`.
-- **Debug logging:** set `ARGUS_PROXY_DEBUG=1` before starting Argus (or `pnpm tauri dev`). The bucket proxy thread prints `[argus-proxy]` lines to stderr: `CONNECT`, incoming MITM request headers, placeholder→secret rewrites (`before` / `after`), upstream request, and response status/headers.
 
 **Out of scope:** gRPC, database drivers (not HTTP).
 

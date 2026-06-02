@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Utc};
 use secrecy::{ExposeSecret, SecretBox};
 
-use crate::db::DbPool;
+use crate::infra::db::DbPool;
 
 #[derive(Clone, Debug)]
 pub struct RegisterDraft {

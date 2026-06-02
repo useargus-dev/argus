@@ -20,18 +20,14 @@ use tokio::sync::watch;
 use tokio_rustls::rustls::ClientConfig;
 use tokio_rustls::TlsAcceptor;
 
-use crate::db::audit;
-use crate::db::bucket_mappings;
+use crate::infra::db::audit;
+use crate::infra::db::bucket_mappings;
 use crate::error::{AppError, AppResult};
 use crate::ipc::VerifiedClient;
 use crate::proxy::auth::{authenticate_proxy_headers, verify_grant};
 use crate::proxy::ca::{self, upstream_root_store};
-use crate::proxy::debug_log::{
-    self, log_connect, log_denied, log_gate_result, log_incoming_request, log_rewrites,
-    log_upstream_request, log_upstream_response,
-};
 use crate::proxy::peer_tcp::peer_pid_from_stream;
-use crate::proxy::rewrite::rewrite_headers;
+use crate::proxy::rewrite::{rewrite_body, rewrite_headers};
 use crate::state::AppState;
 use tauri::Manager;
 
@@ -102,11 +98,6 @@ pub fn start_bucket_proxy(
                     return;
                 }
             };
-            if debug_log::proxy_debug_enabled() {
-                eprintln!(
-                    "[argus-proxy] debug logging enabled (ARGUS_PROXY_DEBUG=1) bucket={bucket_id} port={port}"
-                );
-            }
             if let Err(e) = rt.block_on(run_listener(port, ctx, shutdown_rx)) {
                 eprintln!("bucket proxy {bucket_id} on {port} stopped: {e}");
             }
@@ -206,7 +197,6 @@ async fn handle_connect(
     let header_pairs = parse_header_pairs(lines);
     let started = Instant::now();
     let pid = peer_pid_from_stream(&stream).ok();
-    log_connect(&ctx.bucket_id, &target, pid, &header_pairs);
 
     let gate = with_db(&ctx, |conn, vk| {
         let auth = authenticate_proxy_headers(conn, &header_pairs)?;
@@ -230,7 +220,6 @@ async fn handle_connect(
     let (host_allowed, grant_ok, entries) = match gate {
         Ok(v) => v,
         Err(()) => {
-            log_denied(&ctx.bucket_id, "proxy_auth_or_db", &host);
             stream
                 .write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n")
                 .await?;
@@ -238,23 +227,13 @@ async fn handle_connect(
         }
     };
 
-    log_gate_result(
-        &ctx.bucket_id,
-        &host,
-        host_allowed,
-        grant_ok,
-        entries.len(),
-    );
-
     if !host_allowed {
-        log_denied(&ctx.bucket_id, "host_not_allowed", &host);
         stream
             .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
             .await?;
         return Ok(());
     }
     if !grant_ok {
-        log_denied(&ctx.bucket_id, "grant_denied", &host);
         stream
             .write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n")
             .await?;
@@ -371,16 +350,6 @@ fn build_mitm_response(
         .unwrap_or_else(|_| proxy_error_response(StatusCode::BAD_GATEWAY))
 }
 
-fn response_header_preview(headers: &hyper::HeaderMap, status: StatusCode) -> String {
-    let mut lines = vec![format!("HTTP/1.1 {}", status.as_u16())];
-    for (name, value) in headers.iter().take(20) {
-        if let Ok(v) = value.to_str() {
-            lines.push(format!("{}: {}", name.as_str(), v));
-        }
-    }
-    lines.join("\n")
-}
-
 async fn handle_mitm_request(
     mut req: Request<Incoming>,
     entries: Arc<Vec<bucket_mappings::ProxyRewriteEntry>>,
@@ -398,51 +367,30 @@ async fn handle_mitm_request(
         .unwrap_or("/")
         .to_string();
 
-    let headers_before = req.headers().clone();
-    log_incoming_request(
-        &ctx.bucket_id,
-        &host,
-        &method_str,
-        &uri,
-        &headers_before,
-    );
-
-    let (used_label, header_rewrites) = rewrite_headers(req.headers_mut(), &entries);
-    log_rewrites(&ctx.bucket_id, &header_rewrites);
+    let used_label = rewrite_headers(req.headers_mut(), &entries);
+    let client_headers = req.headers().clone();
 
     let upstream_uri = format!("https://{host}{uri}");
-    let client_headers = req.headers().clone();
 
     let body_bytes = match req.into_body().collect().await {
         Ok(collected) => collected.to_bytes(),
         Err(_) => bytes::Bytes::new(),
     };
+    let body_bytes = rewrite_body(&body_bytes, &entries);
 
-    log_upstream_request(
-        &ctx.bucket_id,
-        &method_str,
+    let upstream_req = match build_upstream_request(
+        method,
         &upstream_uri,
         &client_headers,
-        body_bytes.len(),
-    );
-
-    let upstream_req = match build_upstream_request(method, &upstream_uri, &client_headers, body_bytes)
-    {
+        body_bytes,
+    ) {
         Ok(r) => r,
         Err(()) => return proxy_error_response(StatusCode::BAD_GATEWAY),
     };
 
     let upstream_resp = match upstream_client().request(upstream_req).await {
         Ok(r) => r,
-        Err(e) => {
-            if debug_log::proxy_debug_enabled() {
-                eprintln!(
-                    "[argus-proxy] upstream error bucket={} host={host} err={e}",
-                    ctx.bucket_id
-                );
-            }
-            return proxy_error_response(StatusCode::BAD_GATEWAY);
-        }
+        Err(_) => return proxy_error_response(StatusCode::BAD_GATEWAY),
     };
 
     let status = upstream_resp.status();
@@ -453,14 +401,6 @@ async fn handle_mitm_request(
     };
 
     let elapsed_ms = started.elapsed().as_millis() as u64;
-    let header_preview = response_header_preview(&upstream_headers, status);
-    log_upstream_response(
-        &ctx.bucket_id,
-        status.as_u16(),
-        &header_preview,
-        resp_body.len(),
-        elapsed_ms,
-    );
 
     let _ = with_db(&ctx, |conn, _| {
         audit::proxy_request(

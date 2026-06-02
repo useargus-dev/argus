@@ -9,8 +9,8 @@ use rustls_pemfile::{certs, private_key};
 use tokio_rustls::rustls::ServerConfig;
 use webpki_roots::TLS_SERVER_ROOTS;
 
-use crate::db::argus_dir;
-use crate::db::meta::ensure_argus_dir;
+use crate::infra::db::argus_dir;
+use crate::infra::db::meta::ensure_argus_dir;
 use crate::error::{AppError, AppResult};
 
 pub fn ca_dir() -> PathBuf {

@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
 use crate::error::{AppError, AppResult};
-use crate::user_messages;
+use crate::messages;
 
 use super::machine_id;
 use super::proc_info;
@@ -30,7 +30,7 @@ impl VerifiedClient {
         if pid == 0 {
             return Err(AppError::message(
                 "PEER_RESOLVE",
-                user_messages::peer_resolve("invalid peer pid 0"),
+                messages::peer_resolve("invalid peer pid 0"),
             ));
         }
 
@@ -41,7 +41,7 @@ impl VerifiedClient {
         let proc = system.process(sys_pid).ok_or_else(|| {
             AppError::message(
                 "PEER_RESOLVE",
-                user_messages::peer_resolve(format!(
+                messages::peer_resolve(format!(
                     "process {pid} not found (exited before inspection?)"
                 )),
             )
@@ -54,7 +54,7 @@ impl VerifiedClient {
             .ok_or_else(|| {
                 AppError::message(
                     "PEER_RESOLVE",
-                    user_messages::peer_resolve(format!(
+                    messages::peer_resolve(format!(
                         "could not read executable path for pid {pid}"
                     )),
                 )
@@ -82,7 +82,7 @@ impl VerifiedClient {
                 if parent.is_empty() {
                     return Err(AppError::message(
                         "PEER_RESOLVE",
-                        user_messages::peer_resolve(format!(
+                        messages::peer_resolve(format!(
                             "could not determine working directory for pid {pid}"
                         )),
                     ));

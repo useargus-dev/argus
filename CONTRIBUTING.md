@@ -52,6 +52,10 @@ Save. After that, direct pushes to `main` are rejected; only merged PRs update `
 
 Dependabot version-update PRs are disabled ([dependabot.yml](.github/dependabot.yml); `open-pull-requests-limit: 0`). Use **Security → Dependabot** alerts for vulnerability reporting; bump dependencies manually.
 
+## Source layout
+
+See [docs/structure.md](docs/structure.md) for folder conventions (feature-sliced UI under `src/`, layered Tauri backend under `src-tauri/src/api` + `infra/`, naming limits). UI code imports via `@/` (see `tsconfig.json`).
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the **GNU Affero General Public License v3.0** (or later), and you have the right to license them.

@@ -1,6 +1,5 @@
 pub mod auth;
 pub mod ca;
-pub mod debug_log;
 pub mod peer_tcp;
 pub mod rewrite;
 pub mod server;
@@ -10,7 +9,7 @@ use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager};
 
-use crate::db::buckets;
+use crate::infra::db::buckets;
 use crate::proxy::ca::ensure_ca_material;
 use crate::proxy::server::{start_bucket_proxy, ProxyServerHandle};
 use crate::state::AppState;

@@ -1,8 +1,8 @@
 use base64::Engine;
 use rusqlite::Connection;
 
-use crate::db::buckets;
-use crate::db::client_grants;
+use crate::infra::db::buckets;
+use crate::infra::db::client_grants;
 use crate::error::{AppError, AppResult};
 use crate::ipc::VerifiedClient;
 
@@ -47,25 +47,22 @@ pub fn authenticate_proxy_headers(
     })
 }
 
+/// Requires an OS-verified peer fingerprint matching an active IPC grant.
 pub fn verify_grant(
     conn: &Connection,
     auth: &ProxyAuth,
     peer: Option<&VerifiedClient>,
 ) -> AppResult<bool> {
-    if let Some(p) = peer {
-        if client_grants::find_active_grant(
+    let Some(p) = peer else {
+        return Ok(false);
+    };
+    Ok(
+        client_grants::find_active_grant(
             conn,
             &auth.bucket_id,
             &p.fingerprint,
             &auth.token_hash,
         )?
-        .is_some()
-        {
-            return Ok(true);
-        }
-    }
-    Ok(
-        client_grants::find_active_grant_by_token(conn, &auth.bucket_id, &auth.token_hash)?
-            .is_some(),
+        .is_some(),
     )
 }
