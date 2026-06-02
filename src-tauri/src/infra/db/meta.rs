@@ -11,7 +11,6 @@ use crate::util::{fs as argus_fs, secure};
 
 const MIGRATION_BASE: &str = include_str!("migrations/001_base.sql");
 const MIGRATION_PROXY: &str = include_str!("migrations/002_proxy.sql");
-const MIGRATION_MAPPING_HOSTS: &str = include_str!("migrations/003_mapping_allowed_hosts.sql");
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AccountMeta {
@@ -133,16 +132,6 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
             .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?1)",
-            [Utc::now().to_rfc3339()],
-        )
-        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
-    }
-
-    if version < 3 {
-        conn.execute_batch(MIGRATION_MAPPING_HOSTS)
-            .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
-        conn.execute(
-            "INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?1)",
             [Utc::now().to_rfc3339()],
         )
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
