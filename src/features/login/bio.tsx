@@ -7,12 +7,14 @@ interface BiometricStepProps {
   loading: boolean;
   onSuccess: () => void;
   onBack: () => void;
+  onReregister?: () => void;
 }
 
 export function LoginBiometricStep({
   loading,
   onSuccess,
   onBack,
+  onReregister,
 }: BiometricStepProps) {
   return (
     <div>
@@ -32,6 +34,17 @@ export function LoginBiometricStep({
       >
         Back
       </Button>
+      {onReregister && (
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            className="text-xs text-accent hover:underline"
+            onClick={onReregister}
+          >
+            Re-register second factor
+          </button>
+        </div>
+      )}
     </div>
   );
 }

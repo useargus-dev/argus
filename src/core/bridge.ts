@@ -53,8 +53,8 @@ export const bridge = {
     call<TotpSetup>("prepare_totp_setup", { accountLabel }),
   verifyBiometric: () => call<void>("verify_biometric"),
   registerValidate: (req: {
-    email: string;
-    username: string;
+    email?: string;
+    username?: string;
     firstName: string;
     lastName: string;
     password: string;
@@ -63,6 +63,19 @@ export const bridge = {
     totpCode?: string;
   }) => call<void>("register_validate", { req }),
   registerFinalize: () => call<void>("register_finalize"),
+  takeRegistrationRecoveryCode: () =>
+    call<string | null>("take_registration_recovery_code"),
+  verifyAccountRecovery: (req: { recoveryCode: string }) =>
+    call<{ signedIn: boolean; appLocked: boolean }>("verify_account_recovery", { req }),
+  recoveryResetPassword: (req: { newPassword: string }) =>
+    call<{ username: string; requiresSecondFactor: boolean }>("recovery_reset_password", {
+      req,
+    }),
+  recoveryResetSecondFactor: (req: {
+    secondFactorType: SecondFactorType;
+    totpSecret?: string;
+    totpCode?: string;
+  }) => call<string>("recovery_reset_second_factor", { req }),
   signIn: (req: {
     identifier: string;
     password: string;

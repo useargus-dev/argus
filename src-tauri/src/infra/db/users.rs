@@ -3,6 +3,53 @@ use rusqlite::{params, Connection};
 
 use crate::error::{AppError, AppResult};
 
+pub const PLACEHOLDER_EMAIL: &str = "unset@local.argus";
+
+/// Email for registration when the user skips it (editable later in Settings).
+pub fn resolve_register_email(email: &str) -> String {
+    if email.is_empty() {
+        PLACEHOLDER_EMAIL.to_string()
+    } else {
+        email.to_lowercase()
+    }
+}
+
+/// Username slug when omitted at registration (editable later in Settings).
+pub fn default_register_username(username: &str, first_name: &str, last_name: &str) -> String {
+    if !username.is_empty() {
+        return username.to_string();
+    }
+    let mut slug = String::new();
+    for part in [first_name.trim(), last_name.trim()] {
+        if part.is_empty() {
+            continue;
+        }
+        if !slug.is_empty() {
+            slug.push('-');
+        }
+        for c in part.chars() {
+            if c.is_ascii_alphanumeric() {
+                slug.push(c.to_ascii_lowercase());
+            } else if c == ' ' || c == '-' || c == '_' {
+                slug.push('-');
+            }
+        }
+    }
+    while slug.contains("--") {
+        slug = slug.replace("--", "-");
+    }
+    slug = slug.trim_matches('-').to_string();
+    if slug.len() >= 2 {
+        slug
+    } else {
+        "master".to_string()
+    }
+}
+
+pub fn is_placeholder_email(email: &str) -> bool {
+    email.eq_ignore_ascii_case(PLACEHOLDER_EMAIL)
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfile {
@@ -180,6 +227,47 @@ pub fn set_biometric_enrolled(conn: &Connection, enrolled: bool) -> AppResult<()
     conn.execute(
         "UPDATE users SET biometric_enrolled = ?1 WHERE id = 'local'",
         [if enrolled { 1 } else { 0 }],
+    )
+    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
+pub fn update_password_hash(conn: &Connection, password_hash: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE users SET password_hash = ?1 WHERE id = 'local'",
+        [password_hash],
+    )
+    .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
+/// Replace the sole second factor — clears all others.
+pub fn replace_second_factor(
+    conn: &Connection,
+    second_factor_type: &str,
+    totp_secret_enc: Option<&str>,
+    biometric_enrolled: bool,
+) -> AppResult<()> {
+    let typ = second_factor_type.to_lowercase();
+    if typ != "totp" && typ != "biometric" {
+        return Err(AppError::message("VALIDATION_ERROR", "invalid second factor"));
+    }
+    if typ == "totp" && totp_secret_enc.is_none() {
+        return Err(AppError::message("VALIDATION_ERROR", "TOTP secret required"));
+    }
+    conn.execute(
+        "UPDATE users SET
+            second_factor_type = ?1,
+            totp_enabled = ?2,
+            totp_secret = ?3,
+            biometric_enrolled = ?4
+         WHERE id = 'local'",
+        params![
+            typ,
+            if typ == "totp" { 1 } else { 0 },
+            totp_secret_enc,
+            if typ == "biometric" && biometric_enrolled { 1 } else { 0 },
+        ],
     )
     .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
     Ok(())

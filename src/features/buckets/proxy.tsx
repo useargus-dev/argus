@@ -34,7 +34,7 @@ export function BucketProxySettings({
   return (
     <AccordionSection
       title="Argus Proxy"
-      description="Loopback MITM proxy for this bucket. Enable per env key below, then set allowed hosts on each mapping."
+      description="Loopback MITM proxy for this bucket. Enable per env key below, then set allowed domains on each mapping."
       headerAction={
         <Switch
           checked={bucket.proxyEnabled}

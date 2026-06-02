@@ -15,6 +15,8 @@ pub struct RegisterProgress {
     pub step: String,
     pub status: String,
     pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovery_code: Option<String>,
 }
 
 const STEPS: &[&str] = &[
@@ -28,13 +30,20 @@ const STEPS: &[&str] = &[
     "complete",
 ];
 
-fn emit_progress(app: &AppHandle, step: &str, status: &str, message: Option<String>) {
+fn emit_progress(
+    app: &AppHandle,
+    step: &str,
+    status: &str,
+    message: Option<String>,
+    recovery_code: Option<String>,
+) {
     let _ = app.emit(
         "register-progress",
         RegisterProgress {
             step: step.to_string(),
             status: status.to_string(),
             message,
+            recovery_code,
         },
     );
 }
@@ -68,7 +77,7 @@ pub fn run_finalize(app: AppHandle, state: tauri::State<'_, AppState>) -> AppRes
         let state = app_handle.state::<AppState>();
         let result = finalize_inner(&app_handle, &state, draft);
         if let Err(e) = result {
-            emit_progress(&app_handle, "error", "error", Some(e.to_string()));
+            emit_progress(&app_handle, "error", "error", Some(e.to_string()), None);
         }
 
         if let Ok(mut inner) = state.0.lock() {
@@ -86,8 +95,10 @@ fn finalize_inner(
     state: &tauri::State<'_, AppState>,
     draft: RegisterDraft,
 ) -> AppResult<()> {
+    let mut registration_recovery_code: Option<String> = None;
+
     for step in STEPS {
-        emit_progress(app, step, "running", None);
+        emit_progress(app, step, "running", None, None);
 
         match *step {
             "validate_draft" => validate_draft(&draft)?,
@@ -96,7 +107,8 @@ fn finalize_inner(
             }
             "open_database" | "run_migrations" | "derive_keys" | "persist_user" | "open_session" => {
                 if *step == "open_session" {
-                    establish_session(app, state, &draft)?;
+                    registration_recovery_code =
+                        establish_session(app, state, &draft)?;
                 }
             }
             "complete" => {
@@ -126,13 +138,26 @@ fn finalize_inner(
             _ => {}
         }
 
-        emit_progress(app, step, "done", None);
+        emit_progress(
+            app,
+            step,
+            "done",
+            None,
+            if *step == "complete" {
+                registration_recovery_code.clone()
+            } else {
+                None
+            },
+        );
     }
 
     Ok(())
 }
 
 fn validate_draft(draft: &RegisterDraft) -> AppResult<()> {
+    if draft.first_name.is_empty() || draft.last_name.is_empty() {
+        return Err(AppError::message("VALIDATION_ERROR", "missing name fields"));
+    }
     if draft.email.is_empty() || draft.username.is_empty() {
         return Err(AppError::message("VALIDATION_ERROR", "missing account fields"));
     }
@@ -149,14 +174,14 @@ fn establish_session(
     _app: &AppHandle,
     state: &tauri::State<'_, AppState>,
     draft: &RegisterDraft,
-) -> AppResult<()> {
+) -> AppResult<Option<String>> {
     {
         let inner = state
             .0
             .lock()
             .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
         if inner.is_signed_in() {
-            return Ok(());
+            return Ok(None);
         }
     }
 
@@ -198,6 +223,9 @@ fn establish_session(
         meta::write_totp_secret_enc(enc)?;
     }
 
+    let (recovery_code, _) =
+        crate::api::recovery::persist_registration_recovery(&keys.db_key, &keys.value_key)?;
+
     let mut inner = state
         .0
         .lock()
@@ -211,6 +239,7 @@ fn establish_session(
     inner.register_draft = None;
     inner.pending_sign_in = None;
     inner.app_locked = false;
+    inner.registration_recovery_code = Some(recovery_code.clone());
 
-    Ok(())
+    Ok(Some(recovery_code))
 }

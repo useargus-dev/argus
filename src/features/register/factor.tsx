@@ -15,10 +15,9 @@ import { RegisterTotpPanel } from "@/features/register/totp";
 export function RegisterFactorForm() {
   const navigate = useNavigate();
   const {
-    email,
-    username,
     firstName,
     lastName,
+    username,
     password,
     secondFactorType,
     totpCode,
@@ -47,10 +46,9 @@ export function RegisterFactorForm() {
     try {
       const totpSetup = useRegisterStore.getState().totpSetup;
       await bridge.registerValidate({
-        email: email.trim(),
-        username: username.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        username: username.trim(),
         password,
         secondFactorType,
         totpSecret: secondFactorType === "totp" ? totpSetup?.secret : undefined,
@@ -66,7 +64,8 @@ export function RegisterFactorForm() {
     }
   }
 
-  const accountLabel = email.trim() || username.trim() || "argus@local";
+  const accountLabel =
+    `${firstName.trim()} ${lastName.trim()}`.trim() || "Argus Master";
   const showBio = isBiometricPlatform() && bioAvailable;
 
   const canContinue =

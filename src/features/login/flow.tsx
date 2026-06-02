@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/core/toast";
 
 import { AuthLayout } from "@/shared/layout/auth-layout";
 import { BridgeError, bridge } from "@/core/bridge";
 import { useAuthStore } from "@/state/auth-store";
+import { useRecoveryStore } from "@/state/recovery-store";
 import type { SecondFactorType } from "@/shared/types/auth";
 import { LoginBiometricStep } from "@/features/login/bio";
 import { LoginPasswordForm } from "@/features/login/pass";
@@ -15,6 +16,7 @@ type LoginStep = 1 | 2;
 export function LoginFlow() {
   const navigate = useNavigate();
   const setSignedIn = useAuthStore((s) => s.setSignedIn);
+  const takePrefillUsername = useRecoveryStore((s) => s.takePrefillUsername);
 
   const [step, setStep] = useState<LoginStep>(1);
   const [identifier, setIdentifier] = useState("");
@@ -23,6 +25,11 @@ export function LoginFlow() {
   const [secondFactorType, setSecondFactorType] =
     useState<SecondFactorType>("totp");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const username = takePrefillUsername();
+    if (username) setIdentifier(username);
+  }, [takePrefillUsername]);
 
   async function completeSignIn(opts?: { totpCode?: string; useBiometric?: boolean }) {
     setLoading(true);
@@ -66,6 +73,7 @@ export function LoginFlow() {
           loading={loading}
           onIdentifierChange={setIdentifier}
           onPasswordChange={setPassword}
+          onForgotPassword={() => navigate("/recovery?intent=password")}
           onSubmit={(e) => {
             e.preventDefault();
             void completeSignIn();
@@ -77,6 +85,7 @@ export function LoginFlow() {
           loading={loading}
           onTotpChange={setTotpCode}
           onBack={() => setStep(1)}
+          onReregister={() => navigate("/recovery?intent=factor")}
           onSubmit={(e) => {
             e.preventDefault();
             void completeSignIn({ totpCode });
@@ -87,6 +96,7 @@ export function LoginFlow() {
           loading={loading}
           onSuccess={() => void completeSignIn({ useBiometric: true })}
           onBack={() => setStep(1)}
+          onReregister={() => navigate("/recovery?intent=factor")}
         />
       )}
     </AuthLayout>

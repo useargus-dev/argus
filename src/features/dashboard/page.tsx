@@ -60,7 +60,7 @@ export function DashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1 text-sm text-text-muted">
-          Local-only · all secrets stay on this device
+          Privacy-only · all secrets stay on this device
         </p>
       </div>
 

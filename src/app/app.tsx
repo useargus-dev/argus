@@ -11,6 +11,7 @@ import { BucketsPage } from "@/features/buckets/page";
 import { RequestsPage } from "@/features/clients/requests";
 import { DashboardPage } from "@/features/dashboard/page";
 import { LoginPage } from "@/features/login/page";
+import { RecoveryPage } from "@/features/recovery/page";
 import { RegisterPage } from "@/features/register/page";
 import { RegisterProvisioningPage } from "@/features/register/provision";
 import { SettingsPage } from "@/features/settings/page";
@@ -89,6 +90,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/recovery/*" element={<RecoveryPage />} />
         <Route
           path="/register"
           element={

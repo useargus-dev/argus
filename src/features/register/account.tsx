@@ -10,7 +10,7 @@ import { useRegisterStore } from "@/state/register-store";
 const MIN_PASSWORD = 10;
 
 export function RegisterAccountForm() {
-  const { email, username, firstName, lastName, setAccount, setStep } = useRegisterStore();
+  const { firstName, lastName, username, setAccount, setStep } = useRegisterStore();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
@@ -20,15 +20,19 @@ export function RegisterAccountForm() {
       toast.error("First and last name are required");
       return;
     }
+    if (username.trim().length < 2) {
+      toast.error("Username must be at least 2 characters");
+      return;
+    }
     if (password.length < MIN_PASSWORD) {
-      toast.error(`Password must be at least ${MIN_PASSWORD} characters`);
+      toast.error(`Master password must be at least ${MIN_PASSWORD} characters`);
       return;
     }
     if (password !== confirm) {
-      toast.error("Passwords do not match");
+      toast.error("Master passwords do not match");
       return;
     }
-    setAccount(email.trim(), username.trim(), firstName.trim(), lastName.trim(), password);
+    setAccount(firstName.trim(), lastName.trim(), username.trim(), password);
     setStep(2);
   }
 
@@ -57,17 +61,6 @@ export function RegisterAccountForm() {
             />
           </Field>
         </div>
-        <Field label="Email">
-          <ArgusInput
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) =>
-              useRegisterStore.setState({ email: e.target.value })
-            }
-            required
-          />
-        </Field>
         <Field label="Username">
           <ArgusInput
             autoComplete="username"
@@ -79,12 +72,13 @@ export function RegisterAccountForm() {
           />
         </Field>
         <PasswordInput
+          label="Master password"
           value={password}
           onChange={setPassword}
           autoComplete="new-password"
         />
         <PasswordInput
-          label="Confirm password"
+          label="Confirm master password"
           value={confirm}
           onChange={setConfirm}
           autoComplete="new-password"

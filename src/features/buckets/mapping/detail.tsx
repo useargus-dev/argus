@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Trash2 } from "lucide-react";
 
 import { bridge } from "@/core/bridge";
-import { generateProxyToken } from "@/core/token";
 import { toast } from "@/core/toast";
 import type { BucketMapping } from "@/shared/types/bucket";
 import type { SecretMeta } from "@/shared/types/secret";
@@ -29,8 +28,6 @@ interface BucketMappingDetailPanelProps {
   isDraft: boolean;
   secrets: SecretMeta[];
   proxyBucketEnabled: boolean;
-  /** Plaintext proxy tokens already used by other mappings in this bucket. */
-  bucketProxyTokens: ReadonlySet<string>;
   onDelete?: () => void;
   onSaved: (saved: BucketMapping) => void;
   onCancelDraft?: () => void;
@@ -54,10 +51,6 @@ function formSnapshot(fields: FormFields, proxyBucketEnabled: boolean): string {
   });
 }
 
-function notifyMappingUpdated(saved: BucketMapping) {
-  toast.success(`${saved.envLabel} Updated`);
-}
-
 function fieldsFromMapping(
   mapping: BucketMapping,
   patch?: Partial<FormFields>,
@@ -73,13 +66,23 @@ function fieldsFromMapping(
   };
 }
 
+function emptyFields(): FormFields {
+  return {
+    envLabel: "",
+    mappingType: "secret",
+    secretId: "",
+    textValue: "",
+    proxyEnabled: false,
+    allowedHosts: [],
+  };
+}
+
 export function BucketMappingDetailPanel({
   bucketId,
   mapping,
   isDraft,
   secrets,
   proxyBucketEnabled,
-  bucketProxyTokens,
   onDelete,
   onSaved,
   onCancelDraft,
@@ -90,7 +93,7 @@ export function BucketMappingDetailPanel({
   const [textValue, setTextValue] = useState("");
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [allowedHosts, setAllowedHosts] = useState<string[]>([]);
-  const [proxyToken, setProxyToken] = useState<string | null>(null);
+  const [savedProxyToken, setSavedProxyToken] = useState<string | null>(null);
   const [tokenRevealed, setTokenRevealed] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -98,148 +101,91 @@ export function BucketMappingDetailPanel({
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
 
-  const formRef = useRef<FormFields>({
-    envLabel: "",
-    mappingType: "secret",
-    secretId: "",
-    textValue: "",
-    proxyEnabled: false,
-    allowedHosts: [],
-  });
-
-  formRef.current = {
-    envLabel,
-    mappingType,
-    secretId,
-    textValue,
-    proxyEnabled,
-    allowedHosts,
-  };
+  const currentFields: FormFields = useMemo(
+    () => ({
+      envLabel,
+      mappingType,
+      secretId,
+      textValue,
+      proxyEnabled,
+      allowedHosts,
+    }),
+    [envLabel, mappingType, secretId, textValue, proxyEnabled, allowedHosts],
+  );
 
   const mappingId = mapping?.id ?? null;
   const hydrateKey = isDraft ? "draft" : mappingId;
+  const envNameLocked = !isDraft && !!mapping;
+
+  const dirty = formSnapshot(currentFields, proxyBucketEnabled) !== lastPersisted.current;
+
+  const applyFields = useCallback((fields: FormFields, proxyToken: string | null) => {
+    setEnvLabel(fields.envLabel);
+    setMappingType(fields.mappingType);
+    setSecretId(fields.secretId);
+    setTextValue(fields.textValue);
+    setProxyEnabled(fields.proxyEnabled);
+    setAllowedHosts(fields.allowedHosts);
+    setSavedProxyToken(proxyToken);
+    setTokenRevealed(false);
+  }, []);
 
   useEffect(() => {
     if (mapping) {
-      setEnvLabel(mapping.envLabel);
-      setMappingType(mapping.mappingType);
-      setSecretId(mapping.secretId ?? "");
-      setTextValue(mapping.textValue ?? "");
-      setProxyEnabled(mapping.proxyEnabled);
-      setAllowedHosts(mapping.allowedHosts);
-      setProxyToken(mapping.proxyPlaceholder);
-      lastPersisted.current = formSnapshot(
-        fieldsFromMapping(mapping),
-        proxyBucketEnabled,
-      );
+      const fields = fieldsFromMapping(mapping);
+      applyFields(fields, mapping.proxyPlaceholder);
+      lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
     } else if (isDraft) {
-      setEnvLabel("");
-      setMappingType("secret");
-      setSecretId("");
-      setTextValue("");
-      setProxyEnabled(false);
-      setAllowedHosts([]);
-      setProxyToken(null);
-      lastPersisted.current = "";
+      applyFields(emptyFields(), null);
+      lastPersisted.current = formSnapshot(emptyFields(), proxyBucketEnabled);
     }
+  }, [hydrateKey, isDraft, proxyBucketEnabled, applyFields]);
+
+  const persist = useCallback(async () => {
+    const fields = currentFields;
+    if (!canPersist(fields)) return;
+
+    setSaving(true);
+    try {
+      const saved = await bridge.upsertBucketMapping({
+        bucketId,
+        envLabel: fields.envLabel.trim(),
+        mappingType: fields.mappingType,
+        secretId: fields.mappingType === "secret" ? fields.secretId : undefined,
+        textValue: fields.mappingType === "text" ? fields.textValue.trim() : undefined,
+        proxyEnabled: proxyBucketEnabled && fields.proxyEnabled,
+        allowedHosts: fields.allowedHosts,
+      });
+      lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
+      setSavedProxyToken(saved.proxyPlaceholder);
+      onSavedRef.current(saved);
+      toast.success(isDraft ? `${saved.envLabel} created` : `${saved.envLabel} updated`);
+    } catch (e) {
+      toast.fromError(e, "Failed to save mapping");
+    } finally {
+      setSaving(false);
+    }
+  }, [bucketId, proxyBucketEnabled, currentFields, isDraft]);
+
+  function handleCancel() {
+    if (isDraft) {
+      onCancelDraft?.();
+      return;
+    }
+    if (mapping) {
+      const fields = fieldsFromMapping(mapping);
+      applyFields(fields, mapping.proxyPlaceholder);
+      lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
+    }
+  }
+
+  function handleProxyToggle(enabled: boolean) {
+    setProxyEnabled(enabled);
     setTokenRevealed(false);
-  }, [hydrateKey, isDraft, proxyBucketEnabled]);
-
-  const persist = useCallback(
-    async (patch?: Partial<FormFields>) => {
-      const fields: FormFields = { ...formRef.current, ...patch };
-      if (!canPersist(fields)) return;
-
-      const snapshot = formSnapshot(fields, proxyBucketEnabled);
-      if (snapshot === lastPersisted.current) return;
-
-      setSaving(true);
-      try {
-        const saved = await bridge.upsertBucketMapping({
-          bucketId,
-          envLabel: fields.envLabel.trim(),
-          mappingType: fields.mappingType,
-          secretId: fields.mappingType === "secret" ? fields.secretId : undefined,
-          textValue: fields.mappingType === "text" ? fields.textValue.trim() : undefined,
-          proxyEnabled: proxyBucketEnabled && fields.proxyEnabled,
-          allowedHosts: fields.allowedHosts,
-        });
-        lastPersisted.current = snapshot;
-        if (saved.proxyPlaceholder) {
-          setProxyToken(saved.proxyPlaceholder);
-        }
-        onSavedRef.current(saved);
-        notifyMappingUpdated(saved);
-      } catch (e) {
-        toast.fromError(e, "Failed to save mapping");
-      } finally {
-        setSaving(false);
-      }
-    },
-    [bucketId, proxyBucketEnabled],
-  );
-
-  const commit = useCallback(
-    (patch: Partial<FormFields>) => {
-      if (patch.envLabel !== undefined) setEnvLabel(patch.envLabel);
-      if (patch.mappingType !== undefined) setMappingType(patch.mappingType);
-      if (patch.secretId !== undefined) setSecretId(patch.secretId);
-      if (patch.textValue !== undefined) setTextValue(patch.textValue);
-      if (patch.proxyEnabled !== undefined) setProxyEnabled(patch.proxyEnabled);
-      if (patch.allowedHosts !== undefined) setAllowedHosts(patch.allowedHosts);
-
-      const next = { ...formRef.current, ...patch };
-      formRef.current = next;
-      void persist(patch);
-    },
-    [persist],
-  );
-
-  const handleProxyToggle = useCallback(
-    (enabled: boolean) => {
-      setProxyEnabled(enabled);
-      setTokenRevealed(false);
-
-      if (!enabled) {
-        setProxyToken(null);
-        commit({ proxyEnabled: false });
-        return;
-      }
-
-      const fields = { ...formRef.current, proxyEnabled: true };
-      if (!canPersist(fields)) {
-        const used = new Set(bucketProxyTokens);
-        if (mapping?.proxyPlaceholder) used.delete(mapping.proxyPlaceholder);
-        setProxyToken(generateProxyToken(used));
-        return;
-      }
-
-      setSaving(true);
-      void (async () => {
-        try {
-          const saved = await bridge.upsertBucketMapping({
-            bucketId,
-            envLabel: fields.envLabel.trim(),
-            mappingType: fields.mappingType,
-            secretId: fields.mappingType === "secret" ? fields.secretId : undefined,
-            textValue: fields.mappingType === "text" ? fields.textValue.trim() : undefined,
-            proxyEnabled: true,
-            allowedHosts: fields.allowedHosts,
-          });
-          lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
-          setProxyToken(saved.proxyPlaceholder ?? generateProxyToken());
-          onSavedRef.current(saved);
-          notifyMappingUpdated(saved);
-        } catch (e) {
-          setProxyEnabled(false);
-          toast.fromError(e, "Failed to enable proxy token");
-        } finally {
-          setSaving(false);
-        }
-      })();
-    },
-    [bucketId, proxyBucketEnabled, commit, bucketProxyTokens, mapping?.proxyPlaceholder],
-  );
+    if (!enabled) {
+      setSavedProxyToken(null);
+    }
+  }
 
   if (!mapping && !isDraft) {
     return (
@@ -251,8 +197,8 @@ export function BucketMappingDetailPanel({
 
   const showProxyToken = proxyBucketEnabled && proxyEnabled;
   const maskedToken =
-    proxyToken != null
-      ? "•".repeat(Math.min(Math.max(proxyToken.length, 16), 40))
+    savedProxyToken != null
+      ? "•".repeat(Math.min(Math.max(savedProxyToken.length, 16), 40))
       : "";
 
   return (
@@ -282,9 +228,13 @@ export function BucketMappingDetailPanel({
             className="mt-1 font-mono"
             value={envLabel}
             onChange={(e) => setEnvLabel(e.target.value)}
-            onBlur={() => commit({ envLabel: formRef.current.envLabel })}
             placeholder="OPENAI_API_KEY"
+            disabled={envNameLocked}
+            readOnly={envNameLocked}
           />
+          {envNameLocked && (
+            <p className="mt-1 text-xs text-text-muted">Env name cannot be changed after creation.</p>
+          )}
         </div>
 
         <div>
@@ -292,10 +242,7 @@ export function BucketMappingDetailPanel({
           <select
             className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             value={mappingType}
-            onChange={(e) => {
-              const next = e.target.value as MappingType;
-              commit({ mappingType: next });
-            }}
+            onChange={(e) => setMappingType(e.target.value as MappingType)}
             aria-label="Mapping type"
           >
             <option value="secret">Vault secret</option>
@@ -310,7 +257,7 @@ export function BucketMappingDetailPanel({
               <SecretPicker
                 secrets={secrets}
                 value={secretId}
-                onChange={(id) => commit({ secretId: id })}
+                onChange={setSecretId}
               />
             </div>
           ) : (
@@ -318,7 +265,6 @@ export function BucketMappingDetailPanel({
               className="mt-1"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
-              onBlur={() => commit({ textValue: formRef.current.textValue })}
               placeholder="Plain text value"
             />
           )}
@@ -337,10 +283,10 @@ export function BucketMappingDetailPanel({
 
             {showProxyToken && (
               <div className="space-y-3">
-                {proxyToken ? (
+                {savedProxyToken ? (
                   <div className="flex items-center gap-2 rounded-md border border-border bg-surface-raised/60 px-3 py-2">
                     <code className="block min-w-0 flex-1 break-all py-0.5 font-mono text-xs leading-snug text-text">
-                      {tokenRevealed ? proxyToken : maskedToken}
+                      {tokenRevealed ? savedProxyToken : maskedToken}
                     </code>
                     <button
                       type="button"
@@ -356,11 +302,15 @@ export function BucketMappingDetailPanel({
                       )}
                     </button>
                   </div>
-                ) : null}
+                ) : (
+                  <p className="text-xs text-text-muted">
+                    Save this mapping to generate a proxy token.
+                  </p>
+                )}
 
                 <MappingAllowedHosts
                   hosts={allowedHosts}
-                  onChange={(hosts) => commit({ allowedHosts: hosts })}
+                  onChange={setAllowedHosts}
                   disabled={saving}
                 />
               </div>
@@ -368,10 +318,25 @@ export function BucketMappingDetailPanel({
           </>
         )}
 
-        {isDraft && onCancelDraft && (
-          <div className="pt-2">
-            <Button type="button" variant="secondary" onClick={onCancelDraft}>
+        {dirty && (
+          <div className="flex gap-2 border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={handleCancel}
+              disabled={saving}
+            >
               Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              className="flex-1"
+              onClick={() => void persist()}
+              disabled={saving || !canPersist(currentFields)}
+            >
+              {saving ? "Saving…" : "Save"}
             </Button>
           </div>
         )}

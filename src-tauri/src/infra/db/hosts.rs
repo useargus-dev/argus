@@ -2,6 +2,9 @@
 
 use crate::error::{AppError, AppResult};
 
+/// Sentinel value: allow any request host for proxy rewrite on this mapping.
+pub const ALLOW_ALL_SENTINEL: &str = "*";
+
 /// Strip scheme, port, path; lowercase host.
 pub fn normalize_host(raw: &str) -> String {
     let mut s = raw.trim().to_lowercase();
@@ -26,6 +29,9 @@ pub fn normalize_host_list(hosts: &[String]) -> Vec<String> {
         .map(|h| normalize_host(h))
         .filter(|h| !h.is_empty())
         .collect();
+    if out.iter().any(|h| h == ALLOW_ALL_SENTINEL) {
+        return vec![ALLOW_ALL_SENTINEL.to_string()];
+    }
     out.sort();
     out.dedup();
     out
@@ -43,9 +49,13 @@ pub fn allowed_hosts_to_json(hosts: &[String]) -> AppResult<String> {
 }
 
 /// True if `request_host` matches any allowlist entry (exact or subdomain suffix).
+/// A list containing [`ALLOW_ALL_SENTINEL`] permits any non-empty host.
 pub fn host_is_allowed(request_host: &str, allowed: &[String]) -> bool {
     if allowed.is_empty() {
         return false;
+    }
+    if allowed.iter().any(|entry| entry == ALLOW_ALL_SENTINEL) {
+        return !normalize_host(request_host).is_empty();
     }
     let h = normalize_host(request_host);
     if h.is_empty() {
@@ -70,5 +80,21 @@ mod tests {
         let allowed = vec!["openai.com".to_string()];
         assert!(host_is_allowed("api.openai.com", &allowed));
         assert!(!host_is_allowed("evil.com", &allowed));
+    }
+
+    #[test]
+    fn allow_all_sentinel() {
+        let allowed = vec![ALLOW_ALL_SENTINEL.to_string()];
+        assert!(host_is_allowed("api.openai.com", &allowed));
+        assert!(host_is_allowed("anything.example", &allowed));
+        assert!(!host_is_allowed("", &allowed));
+    }
+
+    #[test]
+    fn normalize_host_list_allow_all_wins() {
+        assert_eq!(
+            normalize_host_list(&["openai.com".to_string(), "*".to_string()]),
+            vec!["*".to_string()]
+        );
     }
 }

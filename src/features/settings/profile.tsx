@@ -26,7 +26,9 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
     setFirstName(profile?.firstName ?? "");
     setLastName(profile?.lastName ?? "");
     setUsername(profile?.username ?? "");
-    setEmail(profile?.email ?? "");
+    setEmail(
+      profile?.email && profile.email !== "unset@local.argus" ? profile.email : "",
+    );
   }, [profile]);
 
   async function handleSave() {
@@ -36,8 +38,8 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
       const updated = await bridge.updateProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        username: username.trim(),
-        email: email.trim(),
+        ...(username.trim() ? { username: username.trim() } : {}),
+        ...(email.trim() ? { email: email.trim() } : {}),
       });
       setSignedIn(updated, scopes);
       toast.success("Profile updated");
@@ -52,7 +54,10 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
     firstName !== (profile?.firstName ?? "") ||
     lastName !== (profile?.lastName ?? "") ||
     username !== (profile?.username ?? "") ||
-    email !== (profile?.email ?? "");
+    email !==
+      (profile?.email && profile.email !== "unset@local.argus"
+        ? profile.email
+        : "");
 
   return (
     <SettingsSection title="Profile" icon={User}>
@@ -75,6 +80,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
           className="min-w-[12rem] flex-1"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          placeholder="Optional"
         />
       </SettingsRow>
       <SettingsRow label="Email">
@@ -83,6 +89,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          placeholder="Optional"
         />
       </SettingsRow>
       <Button

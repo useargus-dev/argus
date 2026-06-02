@@ -16,8 +16,8 @@ export function RegisterFlow() {
     return (
       <RegisterShell
         step={1}
-        title="Create local account"
-        subtitle="Step 1 of 3 — Account details."
+        title="Setup master account"
+        subtitle="Step 1 of 3 — Master account details."
       >
         <RegisterAccountForm />
       </RegisterShell>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Fingerprint, Lock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { bridge } from "@/core/bridge";
 import { toast } from "@/core/toast";
@@ -13,6 +14,7 @@ interface AppLockModalProps {
 }
 
 export function AppLockModal({ open }: AppLockModalProps) {
+  const navigate = useNavigate();
   const setScopes = useAuthStore((s) => s.setScopes);
   const [factor, setFactor] = useState<"totp" | "biometric" | null>(null);
   const [totpCode, setTotpCode] = useState("");
@@ -101,6 +103,16 @@ export function AppLockModal({ open }: AppLockModalProps) {
               {loading ? "Waiting…" : "Unlock with fingerprint / Windows Hello"}
             </Button>
           )}
+        </div>
+
+        <div className="mt-6">
+          <button
+            type="button"
+            className="text-xs text-accent hover:underline"
+            onClick={() => navigate("/recovery?from=lock&intent=factor")}
+          >
+            Re-register second factor
+          </button>
         </div>
       </div>
     </div>

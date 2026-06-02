@@ -24,6 +24,7 @@ export interface RegisterProgress {
   step: string;
   status: "running" | "done" | "error";
   message?: string;
+  recoveryCode?: string;
 }
 
 export interface AuthErrorPayload {

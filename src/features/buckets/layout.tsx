@@ -1,7 +1,4 @@
-import { useMemo } from "react";
-
 import type { BucketMapping } from "@/shared/types/bucket";
-import { collectBucketProxyTokens } from "@/core/token";
 import type { SecretMeta } from "@/shared/types/secret";
 import { BucketMappingDetailPanel } from "@/features/buckets/mapping/detail";
 import { BucketMappingListPanel } from "@/features/buckets/mapping/list";
@@ -36,10 +33,6 @@ export function BucketLayout({
   onCancelDraft,
 }: BucketLayoutProps) {
   const selected = mappings.find((m) => m.id === selectedId) ?? null;
-  const bucketProxyTokens = useMemo(
-    () => collectBucketProxyTokens(mappings),
-    [mappings],
-  );
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:items-start">
@@ -57,7 +50,6 @@ export function BucketLayout({
           isDraft={draftMode}
           secrets={secrets}
           proxyBucketEnabled={proxyBucketEnabled}
-          bucketProxyTokens={bucketProxyTokens}
           onDelete={() => onDelete(selected!.id)}
           onSaved={onSaved}
           onCancelDraft={onCancelDraft}

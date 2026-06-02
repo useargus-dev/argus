@@ -34,7 +34,9 @@ pub fn verify_biometric(app: AppHandle) -> Result<(), String> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterValidateRequest {
+    #[serde(default)]
     pub email: String,
+    #[serde(default)]
     pub username: String,
     pub first_name: String,
     pub last_name: String,
@@ -90,14 +92,17 @@ fn run_register_validate(
 
     let password_hash = hash_password(&req.password)?;
 
+    let email = users::resolve_register_email(req.email.trim());
+    let username = users::default_register_username(req.username.trim(), &req.first_name, &req.last_name);
+
     let mut inner = state
         .0
         .lock()
         .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
 
     inner.register_draft = Some(RegisterDraft {
-        email: req.email.trim().to_lowercase(),
-        username: req.username.trim().to_string(),
+        email,
+        username,
         first_name: req.first_name.trim().to_string(),
         last_name: req.last_name.trim().to_string(),
         password: req.password,
@@ -457,10 +462,19 @@ pub fn get_second_factor_type() -> Result<String, String> {
 }
 
 fn validate_account_fields(req: &RegisterValidateRequest) -> AppResult<()> {
+    if req.first_name.trim().is_empty() || req.last_name.trim().is_empty() {
+        return Err(AppError::message(
+            "VALIDATION_ERROR",
+            "first and last name are required",
+        ));
+    }
     let email = req.email.trim();
-    let username = req.username.trim();
-    if email.is_empty() || !email.contains('@') {
+    if !email.is_empty() && !email.contains('@') {
         return Err(AppError::message("VALIDATION_ERROR", "invalid email"));
+    }
+    let username = req.username.trim();
+    if username.is_empty() {
+        return Err(AppError::message("VALIDATION_ERROR", "username is required"));
     }
     if username.len() < 2 {
         return Err(AppError::message("VALIDATION_ERROR", "username too short"));

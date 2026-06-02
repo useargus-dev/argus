@@ -5,6 +5,7 @@ pub mod client_grants;
 pub mod hosts;
 pub mod ipc_env;
 pub mod meta;
+pub mod rekey;
 pub mod secrets;
 pub mod settings;
 pub mod users;

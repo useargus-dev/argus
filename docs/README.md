@@ -8,6 +8,8 @@ Public technical docs for the Argus desktop app. Start with the [root README](..
 | [security.md](./security.md)         | Threat model, cryptography, hardening checklist                                     |
 | [build-deps.md](./build-deps.md)     | SQLCipher / OpenSSL setup (Windows, macOS, Linux)                                   |
 | [design.md](./design.md)             | UI screens, components, user flows                                                  |
+
+**Screenshots:** `docs/assets/screenshots/` — regenerate with `pnpm screenshots:capture` (see `docs/assets/screenshots/README.md`).
 | [plan.md](./plan.md)                 | **Roadmap** — ordered milestones; many items are not implemented yet                |
 
 ## Auth model (implemented today)

@@ -6,6 +6,8 @@ import { AppLogo } from "@/shared/ui/app-logo";
 import { cn } from "@/core/cn";
 import { useAuthStore } from "@/state/auth-store";
 
+const PLACEHOLDER_EMAIL = "unset@local.argus";
+
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/vault", label: "Vault", icon: KeyRound },
@@ -67,7 +69,9 @@ export function Sidebar() {
             <p className="truncate text-xs text-text-muted">
               {profile.username}
             </p>
-            <p className="truncate text-[11px] text-text-muted">{profile.email}</p>
+            {profile.email && profile.email !== PLACEHOLDER_EMAIL && (
+              <p className="truncate text-[11px] text-text-muted">{profile.email}</p>
+            )}
           </div>
         </div>
       )}

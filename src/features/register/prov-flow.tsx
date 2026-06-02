@@ -15,6 +15,7 @@ export function RegisterProvisioningFlow() {
   const navigate = useNavigate();
   const setSignedIn = useAuthStore((s) => s.setSignedIn);
   const [complete, setComplete] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const didAutoRun = useRef(false);
@@ -47,6 +48,13 @@ export function RegisterProvisioningFlow() {
     if (p.step === "complete" && p.status === "done") {
       setComplete(true);
       setStarted(false);
+      if (p.recoveryCode) {
+        setRecoveryCode(p.recoveryCode);
+      } else {
+        void bridge.takeRegistrationRecoveryCode().then((code) => {
+          if (code) setRecoveryCode(code);
+        });
+      }
     }
   });
 
@@ -60,14 +68,27 @@ export function RegisterProvisioningFlow() {
     navigate("/dashboard", { replace: true });
   }
 
-  if (complete) {
+  if (complete && !recoveryCode) {
+    return (
+      <RegisterShell step={3} title="" subtitle="">
+        <div className="flex flex-col items-center py-8">
+          <Spinner size={32} />
+          <Text tone="muted" className="mt-4 text-sm">
+            Preparing recovery code…
+          </Text>
+        </div>
+      </RegisterShell>
+    );
+  }
+
+  if (complete && recoveryCode) {
     return (
       <RegisterShell
         step={3}
         title=""
         subtitle=""
       >
-        <RegisterCompleteStep onEnter={handleEnter} />
+        <RegisterCompleteStep recoveryCode={recoveryCode} onEnter={handleEnter} />
       </RegisterShell>
     );
   }

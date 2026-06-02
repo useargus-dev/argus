@@ -7,6 +7,7 @@ interface TotpFormProps {
   loading: boolean;
   onTotpChange: (v: string) => void;
   onBack: () => void;
+  onReregister?: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -15,6 +16,7 @@ export function LoginTotpForm({
   loading,
   onTotpChange,
   onBack,
+  onReregister,
   onSubmit,
 }: TotpFormProps) {
   return (
@@ -51,6 +53,17 @@ export function LoginTotpForm({
           {loading ? "Signing in…" : "Sign in"}
         </Button>
       </div>
+      {onReregister && (
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            className="text-xs text-accent hover:underline"
+            onClick={onReregister}
+          >
+            Re-register second factor
+          </button>
+        </div>
+      )}
     </form>
   );
 }

@@ -90,6 +90,24 @@ pub fn write_totp_secret_enc(blob: &str) -> AppResult<()> {
     secure::set_totp_enc(blob)
 }
 
+pub fn write_recovery_escrow(recovery_hash: &str, escrow: &str) -> AppResult<()> {
+    secure::set_recovery_hash(recovery_hash)?;
+    secure::set_recovery_escrow(escrow)
+}
+
+pub fn read_recovery_hash() -> AppResult<String> {
+    secure::get_recovery_hash()
+}
+
+pub fn read_recovery_escrow() -> AppResult<String> {
+    secure::get_recovery_escrow()
+}
+
+pub fn clear_totp_secret_enc() -> AppResult<()> {
+    secure::clear_totp_enc();
+    Ok(())
+}
+
 pub fn ensure_argus_dir() -> AppResult<PathBuf> {
     let dir = argus_dir();
     fs::create_dir_all(&dir).map_err(|e| AppError::message("IO_ERROR", e.to_string()))?;
