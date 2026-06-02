@@ -1,3 +1,6 @@
+# Dependabot version updates disabled (no PRs). Vulnerability reporting is via
+# Dependabot alerts in repo Settings → Code security (enable alerts; disable
+# "Dependabot security updates" if you do not want auto-fix PRs either).
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 
 version: 2
@@ -7,23 +10,11 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
-    groups:
-      dev-dependencies:
-        patterns:
-          - "@*"
-          - "eslint*"
-          - "typescript*"
-          - "vite*"
-          - "@vitejs/*"
-          - "@types/*"
-        update-types:
-          - minor
-          - patch
+    open-pull-requests-limit: 0
 
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
