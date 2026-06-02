@@ -1,6 +1,6 @@
 # Argus — System Architecture
 
-> **Argus** is a local-first secrets vault and approval gateway for developer environments.  
+> **Argus** is a privacy-first secrets vault and approval gateway for developer environments.  
 > One encrypted database. One OS user. Zero cloud. Secrets leave the machine only when a human approves a specific process identity.
 
 > **Implementation note:** **IPC** (local socket/pipe + OS-verified fingerprint + grants + requests popup window + approvals page) and **tray** (hide-on-close, left-click opens requests) are **shipped** on desktop. **Node.js and Python client libraries** are **published**; Go, Ruby, and Java SDKs remain **in development**. Advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
