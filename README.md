@@ -60,6 +60,10 @@ pnpm tauri dev
 | [docs/security.md](docs/security.md) | Threat model, crypto, limitations |
 | [docs/build-deps.md](docs/build-deps.md) | SQLCipher build per OS |
 
+## Contact
+
+Questions and feedback: [ssamuel.sushant@gmail.com](mailto:ssamuel.sushant@gmail.com)
+
 ## License
 
 AGPL-3.0-or-later — see [LICENSE](LICENSE). Commercial licensing: [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md).

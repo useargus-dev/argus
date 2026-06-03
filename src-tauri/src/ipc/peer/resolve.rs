@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
 
 use sha2::{Digest, Sha256};
 use sysinfo::{Pid, ProcessesToUpdate, System};
@@ -150,12 +152,39 @@ fn compute_fingerprint(
 }
 
 fn read_git_remote(cwd: &str) -> Option<String> {
-    let output = Command::new("git")
-        .args(["-C", cwd, "remote", "get-url", "origin"])
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let key = cwd.replace('\\', "/").to_lowercase();
+
+    if let Ok(map) = cache.lock() {
+        if let Some(cached) = map.get(&key) {
+            return cached.clone();
+        }
+    }
+
+    let remote = read_git_remote_uncached(cwd);
+
+    if let Ok(mut map) = cache.lock() {
+        map.insert(key, remote.clone());
+    }
+
+    remote
+}
+
+fn read_git_remote_uncached(cwd: &str) -> Option<String> {
+    let mut cmd = Command::new("git");
+    cmd.args(["-C", cwd, "remote", "get-url", "origin"])
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()?;
+        .stderr(std::process::Stdio::null());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = cmd.output().ok()?;
     if !output.status.success() {
         return None;
     }
