@@ -42,7 +42,7 @@ base64 = "0.22.1"
 hex = "0.4.3"
 dirs = "6.0.0"
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net"] }
-rusqlite = { version = "0.39.0", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.40.0", features = ["bundled-sqlcipher-vendored-openssl"] }
 zeroize = { version = "1.8.2", features = ["derive"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
 totp-rs = { version = "5.7.1", features = ["gen_secret", "qr", "otpauth", "serde_support"] }
