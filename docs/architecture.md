@@ -611,7 +611,7 @@ Lookup client_grants WHERE bucket_id + fingerprint + token_hash
 When **Enable proxy** is on for a bucket:
 
 - Argus binds `127.0.0.1:<port>` where port is allocated from **9000–9100** and stored on `app_buckets.proxy_port`.
-- IPC `ok` responses may include a `proxy` object with `httpProxy`, `httpsProxy`, `noProxy`, and `caBundlePath` (`~/.argus/ca-bundle.pem`). SDKs wire this into **explicit per-client** proxy/CA settings (not global env patches).
+- IPC `ok` responses may include a `proxy` object with `httpProxy`, `httpsProxy`, `noProxy`, and `caBundlePath` (`~/.argus/ca-bundle.pem`). SDKs expose per-library config helpers and agent builders (not global env patches).
 - Mappings with **proxy enabled** receive `argus-proxy-*` placeholders in `env`, never real secrets.
 - Each proxy-enabled mapping has its own `allowed_hosts` (suffix match). Requests to hosts not allowed by any active mapping receive **403**; MITM rewrite applies only for mappings that allow the request host.
 - On `CONNECT`, the proxy validates `Proxy-Authorization` (client token), an active `client_grants` row **for the connecting process fingerprint**, and OS-verified peer PID (Linux/macOS/Windows TCP table).

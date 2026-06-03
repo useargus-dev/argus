@@ -28,8 +28,8 @@ Public technical docs for the Argus desktop app (v0.2). Start with the [root REA
 
 ## Client libraries (v0.2)
 
-- **Node.js** [`@useargus/node`](https://www.npmjs.com/package/@useargus/node) — `loadEnv()`; with Argus Proxy off use any HTTP client; with proxy on use `fetchOptions()`, `axiosDefaults()`, etc.
-- **Python** [`useargus`](https://pypi.org/project/useargus/) — `load_env()`; with proxy on use `httpx_client()`, `anthropic_http_client()`, etc.
+- **Node.js** [`@useargus/node`](https://www.npmjs.com/package/@useargus/node) — `loadEnv()`; with Argus Proxy off use any HTTP client; with proxy on use config helpers and builders (`createArgusUndiciDispatcher`, `argusAxiosClientConfig`, …). Guides: [node-argus/docs/usage](https://github.com/useargus-dev/node-argus/tree/main/docs/usage)
+- **Python** [`useargus`](https://pypi.org/project/useargus/) — `load_env()`; with proxy on use config helpers and builders (`argus_httpx_config`, `create_argus_requests_proxy_adapter`, …). Guides: [py-argus/docs/usage](https://github.com/useargus-dev/py-argus/tree/main/docs/usage)
 - Go, Ruby, Java — **in development** (see [architecture.md](./architecture.md) §16)
 - Test IPC: `pnpm ipc:test` (`scripts/ipc-request.ts`)
 

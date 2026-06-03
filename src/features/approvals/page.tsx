@@ -19,7 +19,7 @@ export function ApprovalsPage() {
         bridge.listGrants(),
         bridge.listPending(),
       ]);
-      setGrants(grantList);
+      setGrants(grantList.filter((g) => g.isActive));
       setPending(pendingList);
     } catch {
       /* locked or not signed in */
@@ -73,15 +73,12 @@ export function ApprovalsPage() {
     );
   }
 
-  const active = grants.filter((g) => g.isActive);
-  const expired = grants.filter((g) => !g.isActive);
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-text">Approvals</h1>
         <p className="mt-1 text-sm text-text-muted">
-          Pending requests, active grants, and expired access to your buckets.
+          Pending requests and active access grants for your buckets.
         </p>
       </div>
 
@@ -107,26 +104,13 @@ export function ApprovalsPage() {
         </section>
       )}
 
-      {active.length > 0 && (
+      {grants.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-muted">
-            Active ({active.length})
+            Active ({grants.length})
           </h2>
           <div className="space-y-2">
-            {active.map((g) => (
-              <GrantCard key={g.id} grant={g} onRevoke={revoke} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {expired.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-muted">
-            Expired ({expired.length})
-          </h2>
-          <div className="space-y-2 opacity-60">
-            {expired.map((g) => (
+            {grants.map((g) => (
               <GrantCard key={g.id} grant={g} onRevoke={revoke} />
             ))}
           </div>
