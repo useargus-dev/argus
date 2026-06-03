@@ -9,10 +9,11 @@ where
     {
         use nix::sys::socket::getsockopt;
         use nix::sys::socket::sockopt::PeerCredentials;
-        use std::os::unix::io::AsRawFd;
+        use std::os::unix::io::{AsRawFd, BorrowedFd};
 
         let fd = stream.as_raw_fd();
-        let cred = getsockopt(&fd, PeerCredentials)
+        let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+        let cred = getsockopt(&borrowed, PeerCredentials)
             .map_err(|e| AppError::message("PEER_RESOLVE", e.to_string()))?;
         let pid = cred.pid();
         if pid <= 0 {
