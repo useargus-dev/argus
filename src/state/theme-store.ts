@@ -5,7 +5,7 @@ import {
   setStoredTheme,
   toggleStoredTheme,
   type Theme,
-} from "../lib/theme";
+} from "@/core/theme";
 
 interface ThemeState {
   theme: Theme;

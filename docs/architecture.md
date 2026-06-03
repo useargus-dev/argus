@@ -1,6 +1,6 @@
 # Argus — System Architecture
 
-> **Argus** is a local-first secrets vault and approval gateway for developer environments.  
+> **Argus** is a privacy-first secrets vault and approval gateway for developer environments.  
 > One encrypted database. One OS user. Zero cloud. Secrets leave the machine only when a human approves a specific process identity.
 
 > **Implementation note:** **IPC** (local socket/pipe + OS-verified fingerprint + grants + requests popup window + approvals page) and **tray** (hide-on-close, left-click opens requests) are **shipped** on desktop. **Node.js and Python client libraries** are **published**; Go, Ruby, and Java SDKs remain **in development**. Advanced tray menus (per-bucket submenu, pause IPC) remain **planned**. See [README](../README.md).
@@ -594,7 +594,7 @@ Lookup client_grants WHERE bucket_id + fingerprint + token_hash
 
 | `status` | Meaning | Client action |
 |---|---|---|
-| `ok` | Secrets map returned | Inject env / use values |
+| `ok` | Secrets map (+ optional `proxy` config) | Inject env / proxy vars |
 | `pending` | Awaiting user | Wait second NDJSON line (up to `timeout_seconds`) |
 | `denied` | User rejected | Fail closed |
 | `locked` | Argus signed out / core stopped | Fallback `.env` if enabled |
@@ -605,6 +605,21 @@ Lookup client_grants WHERE bucket_id + fingerprint + token_hash
 - Short-lived connection per request (or keep-alive v2 — default: one shot).
 - Rate limit per `bucket_id` + `fingerprint`.
 - Max message 64 KiB.
+
+### 11.5 Per-bucket HTTP MITM proxy **(shipped)**
+
+When **Enable proxy** is on for a bucket:
+
+- Argus binds `127.0.0.1:<port>` where port is allocated from **9000–9100** and stored on `app_buckets.proxy_port`.
+- IPC `ok` responses may include a `proxy` object with `httpProxy`, `httpsProxy`, `noProxy`, and `caBundlePath` (`~/.argus/ca-bundle.pem`). SDKs expose per-library config helpers and agent builders (not global env patches).
+- Mappings with **proxy enabled** receive `argus-proxy-*` placeholders in `env`, never real secrets.
+- Each proxy-enabled mapping has its own `allowed_hosts` (suffix match). Requests to hosts not allowed by any active mapping receive **403**; MITM rewrite applies only for mappings that allow the request host.
+- On `CONNECT`, the proxy validates `Proxy-Authorization` (client token), an active `client_grants` row **for the connecting process fingerprint**, and OS-verified peer PID (Linux/macOS/Windows TCP table).
+- MITM TLS uses a local Argus CA; leaf certs are issued per destination host.
+- Header and UTF-8 body rewrite: placeholder substrings are replaced with real secrets before forwarding upstream.
+- Audit events: `PROXY_REQUEST`, `PROXY_HOST_DENIED`, `PROXY_GRANT_DENIED`.
+
+**Out of scope:** gRPC, database drivers (not HTTP).
 
 ---
 

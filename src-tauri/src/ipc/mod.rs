@@ -1,5 +1,5 @@
 mod handler;
-mod peer;
+pub mod peer;
 mod protocol;
 mod server;
 
@@ -9,6 +9,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::sessions::PendingApprovalStore;
 
+pub use peer::VerifiedClient;
 pub use server::IpcServerHandle;
 
 pub struct IpcRuntime {

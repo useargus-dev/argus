@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
 use crate::error::{AppError, AppResult};
+use crate::messages;
 
 use super::machine_id;
 use super::proc_info;
@@ -27,7 +28,10 @@ pub struct VerifiedClient {
 impl VerifiedClient {
     pub fn from_pid(pid: u32, fallback_cwd: Option<&str>) -> AppResult<Self> {
         if pid == 0 {
-            return Err(AppError::message("PEER_RESOLVE", "invalid peer pid 0"));
+            return Err(AppError::message(
+                "PEER_RESOLVE",
+                messages::peer_resolve("invalid peer pid 0"),
+            ));
         }
 
         let mut system = System::new();
@@ -37,7 +41,9 @@ impl VerifiedClient {
         let proc = system.process(sys_pid).ok_or_else(|| {
             AppError::message(
                 "PEER_RESOLVE",
-                format!("process {pid} not found (exited before inspection?)"),
+                messages::peer_resolve(format!(
+                    "process {pid} not found (exited before inspection?)"
+                )),
             )
         })?;
 
@@ -48,7 +54,9 @@ impl VerifiedClient {
             .ok_or_else(|| {
                 AppError::message(
                     "PEER_RESOLVE",
-                    format!("could not read executable path for pid {pid}"),
+                    messages::peer_resolve(format!(
+                        "could not read executable path for pid {pid}"
+                    )),
                 )
             })?;
 
@@ -74,7 +82,9 @@ impl VerifiedClient {
                 if parent.is_empty() {
                     return Err(AppError::message(
                         "PEER_RESOLVE",
-                        format!("could not determine working directory for pid {pid}"),
+                        messages::peer_resolve(format!(
+                            "could not determine working directory for pid {pid}"
+                        )),
                     ));
                 }
                 (parent, false)

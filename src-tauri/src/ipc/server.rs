@@ -5,7 +5,7 @@ use tauri::AppHandle;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::watch;
 
-use crate::db;
+use crate::infra::db;
 use crate::error::AppError;
 use crate::ipc::handler;
 use crate::ipc::peer;

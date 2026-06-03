@@ -1,22 +1,26 @@
 import { create } from "zustand";
 
-import type { SecondFactorType, TotpSetup } from "../types/auth";
+import type { SecondFactorType, TotpSetup } from "@/shared/types/auth";
 
 export type RegisterStep = 1 | 2;
 
 interface RegisterState {
   step: RegisterStep;
-  email: string;
-  username: string;
   firstName: string;
   lastName: string;
+  username: string;
   password: string;
   secondFactorType: SecondFactorType;
   totpSetup: TotpSetup | null;
   totpCode: string;
   biometricReady: boolean;
   setStep: (step: RegisterStep) => void;
-  setAccount: (email: string, username: string, firstName: string, lastName: string, password: string) => void;
+  setAccount: (
+    firstName: string,
+    lastName: string,
+    username: string,
+    password: string,
+  ) => void;
   setSecondFactorType: (t: SecondFactorType) => void;
   setTotpSetup: (setup: TotpSetup | null) => void;
   setTotpCode: (code: string) => void;
@@ -26,10 +30,9 @@ interface RegisterState {
 
 const initial = {
   step: 1 as RegisterStep,
-  email: "",
-  username: "",
   firstName: "",
   lastName: "",
+  username: "",
   password: "",
   secondFactorType: "totp" as SecondFactorType,
   totpSetup: null as TotpSetup | null,
@@ -40,7 +43,8 @@ const initial = {
 export const useRegisterStore = create<RegisterState>((set) => ({
   ...initial,
   setStep: (step) => set({ step }),
-  setAccount: (email, username, firstName, lastName, password) => set({ email, username, firstName, lastName, password }),
+  setAccount: (firstName, lastName, username, password) =>
+    set({ firstName, lastName, username, password }),
   setSecondFactorType: (secondFactorType) =>
     set({ secondFactorType, biometricReady: false, totpSetup: null, totpCode: "" }),
   setTotpSetup: (totpSetup) => set({ totpSetup }),

@@ -1,11 +1,14 @@
-mod commands;
+mod api;
 pub mod crypto;
-pub mod db;
+mod infra;
+pub use infra::db as db;
 mod error;
 mod ipc;
+mod proxy;
 mod register;
 mod sessions;
 mod state;
+mod messages;
 mod util;
 
 use state::AppState;
@@ -20,6 +23,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
         .manage(ipc::IpcRuntime::default())
+        .manage(proxy::ProxyRuntime::default())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -47,7 +51,7 @@ pub fn run() {
                             show_requests_window(app);
                         } else if event.id.as_ref() == "quit" {
                             let state = app.state::<AppState>();
-                            let _ = commands::auth::sign_out(app.clone(), state);
+                            let _ = api::auth::sign_out(app.clone(), state);
                         }
                     })
                     .on_tray_icon_event(|tray, event| {
@@ -86,47 +90,52 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            commands::auth::has_account,
-            commands::auth::prepare_totp_setup,
-            commands::auth::verify_biometric,
-            commands::auth::register_validate,
-            commands::auth::register_finalize,
-            commands::auth::sign_in,
-            commands::auth::sign_out,
-            commands::auth::unlock_app,
-            commands::auth::lock_app,
-            commands::auth::get_scope_status,
-            commands::auth::get_profile,
-            commands::account_settings::update_profile,
-            commands::account_settings::get_second_factor_status,
-            commands::account_settings::enroll_totp,
-            commands::account_settings::enroll_biometric,
-            commands::account_settings::set_active_second_factor,
-            commands::auth::get_second_factor_type,
-            commands::elevation::elevate_vault,
-            commands::elevation::lock_vault,
-            commands::secrets::search_secrets,
-            commands::secrets::get_secret,
-            commands::secrets::create_secret,
-            commands::secrets::update_secret,
-            commands::secrets::delete_secret,
-            commands::buckets::list_buckets,
-            commands::buckets::create_bucket,
-            commands::buckets::delete_bucket,
-            commands::buckets::set_bucket_active,
-            commands::buckets::get_bucket_token,
-            commands::buckets::list_bucket_mappings,
-            commands::buckets::upsert_bucket_mapping,
-            commands::buckets::delete_bucket_mapping,
-            commands::settings::get_settings,
-            commands::settings::set_setting,
-            commands::clients::is_signed_in,
-            commands::clients::show_main_window,
-            commands::clients::list_pending_client_access,
-            commands::clients::respond_to_client_access,
-            commands::clients::pending_client_access_count,
-            commands::clients::list_grants,
-            commands::clients::revoke_grant,
+            api::auth::has_account,
+            api::auth::prepare_totp_setup,
+            api::auth::verify_biometric,
+            api::auth::register_validate,
+            api::auth::register_finalize,
+            api::auth::sign_in,
+            api::auth::sign_out,
+            api::auth::unlock_app,
+            api::auth::lock_app,
+            api::auth::get_scope_status,
+            api::auth::get_profile,
+            api::account::update_profile,
+            api::account::get_second_factor_status,
+            api::account::enroll_totp,
+            api::account::enroll_biometric,
+            api::account::set_active_second_factor,
+            api::auth::get_second_factor_type,
+            api::recovery::verify_account_recovery,
+            api::recovery::recovery_reset_password,
+            api::recovery::recovery_reset_second_factor,
+            api::recovery::take_registration_recovery_code,
+            api::elevate::elevate_vault,
+            api::elevate::lock_vault,
+            api::secrets::search_secrets,
+            api::secrets::get_secret,
+            api::secrets::create_secret,
+            api::secrets::update_secret,
+            api::secrets::delete_secret,
+            api::buckets::list_buckets,
+            api::buckets::create_bucket,
+            api::buckets::delete_bucket,
+            api::buckets::set_bucket_active,
+            api::buckets::set_bucket_proxy_enabled,
+            api::buckets::get_bucket_token,
+            api::buckets::list_bucket_mappings,
+            api::buckets::upsert_bucket_mapping,
+            api::buckets::delete_bucket_mapping,
+            api::settings::get_settings,
+            api::settings::set_setting,
+            api::clients::is_signed_in,
+            api::clients::show_main_window,
+            api::clients::list_pending,
+            api::clients::respond_access,
+            api::clients::pending_count,
+            api::clients::list_grants,
+            api::clients::revoke_grant,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -150,7 +159,7 @@ fn should_run_in_background(app: &tauri::AppHandle) -> bool {
         Ok(c) => c,
         Err(_) => return true,
     };
-    crate::db::settings::get_or_default(&conn, "run_in_background", "1")
+    crate::infra::db::settings::get_or_default(&conn, "run_in_background", "1")
         .map(|v| v == "1")
         .unwrap_or(true)
 }

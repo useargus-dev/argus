@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Utc};
 use secrecy::{ExposeSecret, SecretBox};
 
-use crate::db::DbPool;
+use crate::infra::db::DbPool;
 
 #[derive(Clone, Debug)]
 pub struct RegisterDraft {
@@ -65,6 +65,21 @@ pub struct AppStateInner {
     pub auth_lockout_until: Option<DateTime<Utc>>,
     /// UI / policy lock while keys remain in memory (re-unlock with second factor only).
     pub app_locked: bool,
+    /// Verified recovery session (password / second-factor reset).
+    pub recovery_session: Option<RecoverySession>,
+    /// Plain recovery code shown once after registration (cleared after read).
+    pub registration_recovery_code: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct RecoverySession {
+    pub verified_at: DateTime<Utc>,
+    /// Normalized recovery code (memory-only, for re-wrapping escrow after password change).
+    pub recovery_code: String,
+    /// When signed out, temporary DB pool opened via recovery escrow.
+    pub recovery_db: Option<DbPool>,
+    pub recovery_db_key: Option<SecretBox<[u8; 32]>>,
+    pub recovery_value_key: Option<SecretBox<[u8; 32]>>,
 }
 
 #[derive(Clone, Debug)]
@@ -91,6 +106,8 @@ impl Default for AppStateInner {
             auth_failures: 0,
             auth_lockout_until: None,
             app_locked: false,
+            recovery_session: None,
+            registration_recovery_code: None,
         }
     }
 }
@@ -154,6 +171,8 @@ impl AppStateInner {
         self.auth_failures = 0;
         self.auth_lockout_until = None;
         self.app_locked = false;
+        self.recovery_session = None;
+        self.registration_recovery_code = None;
     }
 }
 

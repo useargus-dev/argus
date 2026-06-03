@@ -14,6 +14,7 @@ export default defineConfig(async () => ({
   plugins: [react(), tailwindcss(), boneyardPlugin()],
   resolve: {
     alias: {
+      "@": path.resolve(__dirname, "src"),
       "@argus/public": path.resolve(__dirname, "public"),
     },
   },

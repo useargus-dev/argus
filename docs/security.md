@@ -70,7 +70,7 @@
 | ---------------------------------------------------- | -------------------------------------------------- |
 | **O1** Root / kernel attacker                        | Can dump process memory of unlocked Argus          |
 | **O2** User approves malicious binary                | User must read `process_path` — social engineering |
-| **O3** Malware after env injection                   | Client app holds secrets in `os.environ`           |
+| **O3** Malware after env injection                   | Mitigated for **proxy-enabled** mappings (placeholders only); non-proxy mappings and `.env` overrides still expose values in `os.environ` |
 | **O4** Physical forensic disk imaging while unlocked | Memory keys exist while running                    |
 | **O5** Nation-state hardware implants                | —                                                  |
 | **O6** Coerced user unlocks vault                    | —                                                  |
@@ -585,19 +585,26 @@ Pin versions in `Cargo.lock` / `pnpm-lock.yaml`.
 
 ## 18. Known Limitations
 
-Publish these in the public threat model (Phase 4):
+Published in the public threat model and on the project website:
 
-1. **Post-injection exposure** — Argus cannot control client app memory after `os.environ` set.
-2. **User-approved malware** — Approval UI is the last line; misleading process names possible (show full path).
-3. **Root attacker** — Can attach debugger to unlocked Argus.
-4. **Plaintext metadata** — Secret names/orgs searchable inside encrypted DB file structure (SQLCipher hides content, not existence of a DB).
-5. **TOTP seed** — Requires master password to decrypt; loss of password = loss of vault (unless backup export exists).
+1. **Post-injection exposure (non-proxy)** — When Argus Proxy is off, real values land in `os.environ` / `process.env`. Argus cannot control client memory after injection.
+2. **Post-rewrite exposure (proxy)** — Proxy mappings use placeholders in env; real secrets are rewritten at MITM time. Client libraries and upstream requests still handle plaintext in memory.
+3. **User-approved malware** — Approval UI is the last line; misleading process names possible (show full path).
+4. **Root attacker** — Can attach debugger to unlocked Argus.
+5. **Plaintext metadata** — Secret names/orgs searchable inside encrypted DB file structure (SQLCipher hides content, not existence of a DB).
+6. **TOTP seed / master password loss** — Requires master password or one-time recovery code; no cloud recovery.
+7. **Local MITM CA** — Argus Proxy requires trusting `~/.argus/ca-bundle.pem` in HTTP clients. Compromise of CA material on disk is out of scope.
+8. **Proxy scope** — HTTP(S) only; gRPC and database drivers not supported.
+9. **Allowed domains** — Restrict mode with empty list blocks all hosts until domains are added.
+10. **Audit log** — Partial coverage; not every UI action is recorded in v0.2.
+11. **Screen lock → app lock** — Planned; not wired in v0.2.
+12. **Master password change** — Recovery flow only; not available in Settings while signed in.
 
 ---
 
 ## 19. Release Security Checklist
 
-Before tagging `v0.1.0`:
+Before tagging `v0.2.0`:
 
 - [ ] CSP enabled and tested
 - [ ] Capabilities least-privilege review
@@ -634,7 +641,7 @@ Report via **[SECURITY.md](../SECURITY.md)** (GitHub Security Advisories). Do no
 
 ## Appendix — Security feature summary
 
-| Feature                                           | Status (v0.1)     |
+| Feature                                           | Status (v0.2)     |
 | ------------------------------------------------- | ----------------- |
 | SQLCipher full-DB encryption                      | Shipped           |
 | Local account + mandatory 2FA (TOTP or biometric) | Shipped           |
@@ -653,6 +660,8 @@ Report via **[SECURITY.md](../SECURITY.md)** (GitHub Security Advisories). Do no
 | Append-only audit (full)                          | Partial / planned |
 | Screen lock integration                           | Planned           |
 | Type-based inject blocking (IPC)                  | Shipped           |
+| Per-bucket HTTP MITM proxy (9000–9100)            | Shipped           |
+| Proxy placeholders + host allowlist               | Shipped           |
 | Isolation pattern                                 | Recommended       |
 | OS keychain pepper                                | Future            |
 | Hardware security key                             | Future            |

@@ -12,7 +12,7 @@ const MEMORY_KIB: u32 = 65536;
 const TIME_COST: u32 = 3;
 const PARALLELISM: u32 = 4;
 
-fn argon2() -> AppResult<Argon2<'static>> {
+pub fn argon2() -> AppResult<Argon2<'static>> {
     let params = Params::new(MEMORY_KIB, TIME_COST, PARALLELISM, Some(32))
         .map_err(|e| AppError::message("CRYPTO_ERROR", e.to_string()))?;
     Ok(Argon2::new(
