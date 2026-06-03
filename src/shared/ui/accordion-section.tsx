@@ -42,13 +42,7 @@ export function AccordionSection({
           <h2 className="min-w-0 text-sm font-semibold">{title}</h2>
         </button>
         {headerAction != null && (
-          <div
-            className="flex shrink-0 items-center gap-2"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {headerAction}
-          </div>
+          <div className="flex shrink-0 items-center gap-2">{headerAction}</div>
         )}
       </div>
       {open && (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff, Trash2 } from "lucide-react";
 
 import { bridge } from "@/core/bridge";
@@ -96,10 +96,7 @@ export function BucketMappingDetailPanel({
   const [savedProxyToken, setSavedProxyToken] = useState<string | null>(null);
   const [tokenRevealed, setTokenRevealed] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  const lastPersisted = useRef("");
-  const onSavedRef = useRef(onSaved);
-  onSavedRef.current = onSaved;
+  const [persistedSnapshot, setPersistedSnapshot] = useState("");
 
   const currentFields: FormFields = useMemo(
     () => ({
@@ -117,7 +114,8 @@ export function BucketMappingDetailPanel({
   const hydrateKey = isDraft ? "draft" : mappingId;
   const envNameLocked = !isDraft && !!mapping;
 
-  const dirty = formSnapshot(currentFields, proxyBucketEnabled) !== lastPersisted.current;
+  const dirty =
+    formSnapshot(currentFields, proxyBucketEnabled) !== persistedSnapshot;
 
   const applyFields = useCallback((fields: FormFields, proxyToken: string | null) => {
     setEnvLabel(fields.envLabel);
@@ -134,12 +132,13 @@ export function BucketMappingDetailPanel({
     if (mapping) {
       const fields = fieldsFromMapping(mapping);
       applyFields(fields, mapping.proxyPlaceholder);
-      lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
+      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
     } else if (isDraft) {
-      applyFields(emptyFields(), null);
-      lastPersisted.current = formSnapshot(emptyFields(), proxyBucketEnabled);
+      const fields = emptyFields();
+      applyFields(fields, null);
+      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
     }
-  }, [hydrateKey, isDraft, proxyBucketEnabled, applyFields]);
+  }, [hydrateKey, isDraft, mapping, proxyBucketEnabled, applyFields]);
 
   const persist = useCallback(async () => {
     const fields = currentFields;
@@ -156,16 +155,16 @@ export function BucketMappingDetailPanel({
         proxyEnabled: proxyBucketEnabled && fields.proxyEnabled,
         allowedHosts: fields.allowedHosts,
       });
-      lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
+      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
       setSavedProxyToken(saved.proxyPlaceholder);
-      onSavedRef.current(saved);
+      onSaved(saved);
       toast.success(isDraft ? `${saved.envLabel} created` : `${saved.envLabel} updated`);
     } catch (e) {
       toast.fromError(e, "Failed to save mapping");
     } finally {
       setSaving(false);
     }
-  }, [bucketId, proxyBucketEnabled, currentFields, isDraft]);
+  }, [bucketId, proxyBucketEnabled, currentFields, isDraft, onSaved]);
 
   function handleCancel() {
     if (isDraft) {
@@ -175,7 +174,7 @@ export function BucketMappingDetailPanel({
     if (mapping) {
       const fields = fieldsFromMapping(mapping);
       applyFields(fields, mapping.proxyPlaceholder);
-      lastPersisted.current = formSnapshot(fields, proxyBucketEnabled);
+      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
     }
   }
 
@@ -223,8 +222,11 @@ export function BucketMappingDetailPanel({
 
       <div className="mt-4 space-y-4">
         <div>
-          <label className="text-xs font-medium text-text-muted">Env name</label>
+          <label htmlFor="mapping-env-label" className="text-xs font-medium text-text-muted">
+            Env name
+          </label>
           <ArgusInput
+            id="mapping-env-label"
             className="mt-1 font-mono"
             value={envLabel}
             onChange={(e) => setEnvLabel(e.target.value)}
@@ -238,12 +240,14 @@ export function BucketMappingDetailPanel({
         </div>
 
         <div>
-          <label className="text-xs font-medium text-text-muted">Type</label>
+          <label htmlFor="mapping-type" className="text-xs font-medium text-text-muted">
+            Type
+          </label>
           <select
+            id="mapping-type"
             className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             value={mappingType}
             onChange={(e) => setMappingType(e.target.value as MappingType)}
-            aria-label="Mapping type"
           >
             <option value="secret">Vault secret</option>
             <option value="text">Text value</option>
@@ -251,9 +255,11 @@ export function BucketMappingDetailPanel({
         </div>
 
         <div>
-          <label className="text-xs font-medium text-text-muted">Value</label>
+          <span id="mapping-value-label" className="text-xs font-medium text-text-muted">
+            Value
+          </span>
           {mappingType === "secret" ? (
-            <div className="mt-1">
+            <div className="mt-1" aria-labelledby="mapping-value-label">
               <SecretPicker
                 secrets={secrets}
                 value={secretId}
@@ -262,7 +268,9 @@ export function BucketMappingDetailPanel({
             </div>
           ) : (
             <ArgusInput
+              id="mapping-text-value"
               className="mt-1"
+              aria-labelledby="mapping-value-label"
               value={textValue}
               onChange={(e) => setTextValue(e.target.value)}
               placeholder="Plain text value"
