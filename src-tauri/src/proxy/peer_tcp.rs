@@ -5,16 +5,14 @@ pub fn peer_pid_from_stream<S>(stream: &S) -> AppResult<u32>
 where
     S: std::os::unix::io::AsRawFd,
 {
-    use std::os::fd::RawFd;
-    use std::os::unix::io::AsRawFd;
-
-    let fd = stream.as_raw_fd();
-
     #[cfg(target_os = "linux")]
     {
         use nix::sys::socket::getsockopt;
         use nix::sys::socket::sockopt::PeerCredentials;
-        let cred = getsockopt(fd, PeerCredentials)
+        use std::os::unix::io::AsRawFd;
+
+        let fd = stream.as_raw_fd();
+        let cred = getsockopt(&fd, PeerCredentials)
             .map_err(|e| AppError::message("PEER_RESOLVE", e.to_string()))?;
         let pid = cred.pid();
         if pid <= 0 {
@@ -26,6 +24,9 @@ where
     #[cfg(target_os = "macos")]
     {
         use std::os::raw::c_int;
+        use std::os::unix::io::AsRawFd;
+
+        let fd = stream.as_raw_fd();
         const LOCAL_PEERPID: c_int = 0x002;
         let mut pid: u32 = 0;
         let r = unsafe {
@@ -45,7 +46,7 @@ where
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
-        let _ = fd;
+        let _ = stream;
         Err(AppError::message(
             "PEER_RESOLVE",
             "TCP peer pid not supported on this unix platform",
