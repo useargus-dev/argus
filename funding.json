@@ -1,0 +1,190 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.1.0",
+  "entity": {
+    "type": "individual",
+    "role": "maintainer",
+    "name": "Sushant Samuel",
+    "email": "ssamuel.sushant@gmail.com",
+    "description": "Maintainer of Argus (useargus.dev), a local-first secrets vault and approval gateway for developer environments. The project is at v0.2: a cross-platform Tauri desktop app with SQLCipher storage, OS-verified IPC grants, optional per-bucket HTTP MITM proxy, and published Python/Node client libraries.\n\nArgus is AGPL-3.0 community edition, actively developed but not yet independently security-audited. I work on it part-time alongside other commitments.\n\nPrimary one-time ask: $50,000 across two active plans — independent security audit ($25,000) and argus run v0.3 development ($25,000). Other roadmap items are secondary and marked inactive in this manifest.",
+    "webpageUrl": {
+      "url": "https://useargus.dev",
+      "wellKnown": "https://useargus.dev/.well-known/funding-manifest-urls"
+    }
+  },
+  "projects": [
+    {
+      "guid": "argus",
+      "name": "Argus",
+      "description": "Privacy-first secrets vault and local approval gateway. Secrets live in an encrypted SQLCipher database on the user's machine; apps request bucket env vars over a local Unix socket or Windows named pipe. Each request is gated by OS-verified process fingerprint, bucket client token, and human approval with configurable TTL.\n\nShipped (v0.2): desktop app (Windows, macOS, Linux), vault CRUD, buckets, audit log, Argus Proxy (loopback MITM on ports 9000–9100 with placeholder rewrite and host allowlists), Python and Node SDKs.\n\nPlanned: argus run for OS-level transparent HTTP/HTTPS capture (mitmproxy_rs redirectors + existing Argus MITM stack), CLI commands, Go/Ruby/Java clients, and self-hosted team infrastructure.\n\nImpact: reduces plaintext secrets in repos and shell history, gives developers explicit control over which processes receive credentials, and keeps secrets off third-party cloud vault APIs for local workflows. Honest limits: not audited yet; root/kernel attackers and coerced approvals remain out of scope; proxy mode requires trust in local MITM.",
+      "webpageUrl": {
+        "url": "https://useargus.dev",
+        "wellKnown": "https://useargus.dev/.well-known/funding-manifest-urls"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/useargus-dev/argus",
+        "wellKnown": "https://github.com/useargus-dev/argus/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:AGPL-3.0-or-later"],
+      "tags": [
+        "developer-tools",
+        "security",
+        "secrets-management",
+        "desktop-app",
+        "privacy",
+        "local-first"
+      ]
+    },
+    {
+      "guid": "py-argus",
+      "name": "useargus (Python SDK)",
+      "description": "Python client library for Argus IPC: load_env() resolves bucket credentials from the local Argus daemon with grant approval, optional .env fallback when Argus is locked, and proxy placeholder support for HTTP clients. Published on PyPI as useargus (v0.2).\n\nNeeds: parity with upcoming argus run mode, stricter error surfaces for grant denial, and documentation for proxy-enabled mappings across requests/httpx/LangChain patterns already documented in the main repo.",
+      "webpageUrl": {
+        "url": "https://pypi.org/project/useargus/"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/useargus-dev/py-argus",
+        "wellKnown": "https://github.com/useargus-dev/py-argus/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:MIT"],
+      "tags": ["developer-tools", "python", "sdk", "secrets-management"]
+    },
+    {
+      "guid": "node-argus",
+      "name": "@useargus/node (Node.js SDK)",
+      "description": "Node.js client library for Argus IPC: loadEnv() for bucket resolution, grant flow integration, and proxy placeholder patterns for fetch/axios. Published on npm as @useargus/node (v0.2).\n\nNeeds: ESM/CJS packaging maintenance, grant error handling aligned with desktop IPC v4 (planned for run mode), and test coverage against real Argus socket on CI runners.",
+      "webpageUrl": {
+        "url": "https://www.npmjs.com/package/@useargus/node"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/useargus-dev/node-argus",
+        "wellKnown": "https://github.com/useargus-dev/node-argus/blob/main/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:MIT"],
+      "tags": ["developer-tools", "nodejs", "sdk", "secrets-management"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "github-sponsors",
+        "type": "payment-provider",
+        "address": "https://github.com/sponsors/useargus-dev",
+        "description": "GitHub Sponsors for recurring or one-time support."
+      },
+      {
+        "guid": "bank-transfer",
+        "type": "bank",
+        "address": "",
+        "description": "Direct bank transfer for grants and larger one-time contributions. Email ssamuel.sushant@gmail.com for payment details."
+      },
+      {
+        "guid": "grant-contact",
+        "type": "other",
+        "address": "ssamuel.sushant@gmail.com",
+        "description": "Contact for grant programs (FLOSS/Fund, Alpha-Omega, GitHub Secure Open Source Fund) and coordinated security funding."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "security-audit",
+        "status": "active",
+        "name": "Independent security audit and remediation",
+        "description": "Third-party review of Argus IPC, client grants, SQLCipher key handling, Argus Proxy MITM path, and release signing. Includes prioritized fixes, post-audit IPC/proxy hardening, fuzzing on the socket protocol, and re-test of critical findings. Argus handles live credentials locally; an audit is the largest gap before wider adoption.",
+        "amount": 25000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["bank-transfer", "grant-contact"]
+      },
+      {
+        "guid": "run-mode-v03",
+        "status": "active",
+        "name": "argus run — OS sandbox capture (v0.3)",
+        "description": "Build argus run <command> CLI sidecar and OS-level transparent HTTP/HTTPS capture via mitmproxy_rs (Linux eBPF, then Windows WinDivert, macOS Network Extension). Includes sandbox session grants, transparent proxy acceptor in Argus core, and doctor/status/traffic commands. Wrapped process trees use existing bucket rewrite rules without per-library proxy wiring.",
+        "amount": 25000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["bank-transfer", "grant-contact", "github-sponsors"]
+      },
+      {
+        "guid": "ipc-proxy-hardening",
+        "status": "inactive",
+        "name": "IPC and proxy hardening (pre-audit and post-audit)",
+        "description": "Deferred as a separate line item; scope is included in the security-audit plan. Threat-model updates, grant TTL edge cases, proxy auth binding to peer PID, and signed releases.",
+        "amount": 8000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["github-sponsors", "bank-transfer", "grant-contact"]
+      },
+      {
+        "guid": "cli-ecosystem",
+        "status": "inactive",
+        "name": "CLI and shell integration",
+        "description": "argus get, list, and export shell commands with eval-safe export (no secret values in shell history), advanced tray menus, and docs for CI usage patterns. Extends Argus beyond the desktop UI for scripts and automation.",
+        "amount": 5000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["github-sponsors", "bank-transfer"]
+      },
+      {
+        "guid": "additional-sdks",
+        "status": "inactive",
+        "name": "Go, Ruby, and JVM client libraries",
+        "description": "Ship and maintain argus-go, Ruby gem, and Java/JVM client with the same grant + bucket semantics as Python/Node. Go is first priority for backend and CI adopters; Ruby and Java follow documented demand.",
+        "amount": 6000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["github-sponsors", "bank-transfer"]
+      },
+      {
+        "guid": "self-hosted-foundation",
+        "status": "inactive",
+        "name": "Self-hosted team backend (foundation phase)",
+        "description": "Initial work toward a self-hosted Argus server: team vault backend scaffold, basic multi-user auth, shared buckets, remote agent/IPC bridge for CI, and organizational audit export. Full SSO/HA/enterprise scope is later roadmap; this plan covers an honest first milestone, not a finished enterprise product.",
+        "amount": 12000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["bank-transfer", "grant-contact"]
+      },
+      {
+        "guid": "maintainer-time",
+        "status": "active",
+        "name": "Part-time maintainer compensation",
+        "description": "Covers ongoing bug fixes, dependency updates (Tauri, mitmproxy_rs, SQLCipher), triage, release builds for three desktop platforms, and community support. Argus is maintained part-time today; this would modestly increase sustained development bandwidth.",
+        "amount": 800,
+        "currency": "USD",
+        "frequency": "monthly",
+        "channels": ["github-sponsors", "bank-transfer"]
+      },
+      {
+        "guid": "infra-hosting",
+        "status": "active",
+        "name": "Infrastructure and release tooling",
+        "description": "Domain (useargus.dev), code-signing/notarization costs (Apple Developer, Windows Authenticode), CI minutes, and static site hosting. Small but recurring; keeps releases and documentation available.",
+        "amount": 120,
+        "currency": "USD",
+        "frequency": "monthly",
+        "channels": ["github-sponsors"]
+      },
+      {
+        "guid": "goodwill",
+        "status": "active",
+        "name": "Goodwill contribution",
+        "description": "Any amount to support Argus development with no specific deliverable attached.",
+        "amount": 0,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["github-sponsors", "bank-transfer"]
+      }
+    ],
+    "history": [
+      {
+        "year": 2025,
+        "income": 0,
+        "expenses": 1200,
+        "currency": "USD",
+        "description": "Self-funded: domain, code-signing accounts, and release tooling. No external grants or sponsorship income received."
+      }
+    ]
+  }
+}
