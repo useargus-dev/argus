@@ -6,7 +6,7 @@
     "role": "maintainer",
     "name": "Sushant Samuel",
     "email": "ssamuel.sushant@gmail.com",
-    "description": "Maintainer of Argus (useargus.dev), a local-first secrets vault and approval gateway for developer environments. The project is at v0.2: a cross-platform Tauri desktop app with SQLCipher storage, OS-verified IPC grants, optional per-bucket HTTP MITM proxy, and published Python/Node client libraries.\n\nArgus is AGPL-3.0 community edition, actively developed but not yet independently security-audited. I work on it part-time alongside other commitments. Funding would go directly toward security review, hardening, and shipping the remaining roadmap (argus run sandbox mode, CLI tooling, additional SDKs, and a self-hosted team backend) — not marketing or SaaS conversion.",
+    "description": "Maintainer of Argus (useargus.dev), a local-first secrets vault and approval gateway for developer environments. The project is at v0.2: a cross-platform Tauri desktop app with SQLCipher storage, OS-verified IPC grants, optional per-bucket HTTP MITM proxy, and published Python/Node client libraries.\n\nArgus is AGPL-3.0 community edition, actively developed but not yet independently security-audited. I work on it part-time alongside other commitments.\n\nPrimary one-time ask: $50,000 across two active plans — independent security audit ($25,000) and argus run v0.3 development ($25,000). Other roadmap items are secondary and marked inactive in this manifest.",
     "webpageUrl": {
       "url": "https://useargus.dev",
       "wellKnown": "https://useargus.dev/.well-known/funding-manifest-urls"
@@ -90,35 +90,35 @@
         "guid": "security-audit",
         "status": "active",
         "name": "Independent security audit and remediation",
-        "description": "Fund a third-party review of Argus IPC, client grants, SQLCipher key handling, Argus Proxy MITM path, and release signing pipeline. Deliverables: written report, prioritized fixes, and re-test of critical findings before calling v0.3 production-ready. Argus handles live credentials locally; an audit is the largest gap between current v0.2 and responsible wider adoption.",
-        "amount": 18000,
+        "description": "Third-party review of Argus IPC, client grants, SQLCipher key handling, Argus Proxy MITM path, and release signing. Includes prioritized fixes, post-audit IPC/proxy hardening, fuzzing on the socket protocol, and re-test of critical findings. Argus handles live credentials locally; an audit is the largest gap before wider adoption.",
+        "amount": 25000,
         "currency": "USD",
         "frequency": "one-time",
         "channels": ["bank-transfer", "grant-contact"]
-      },
-      {
-        "guid": "ipc-proxy-hardening",
-        "status": "active",
-        "name": "IPC and proxy hardening (pre-audit and post-audit)",
-        "description": "Engineering time for threat-model updates, fuzzing/negative tests on the socket protocol, grant TTL edge cases, proxy auth binding to peer PID, signed release artifacts, and documentation aligned with docs/security.md. Complements the external audit rather than replacing it.",
-        "amount": 8000,
-        "currency": "USD",
-        "frequency": "one-time",
-        "channels": ["github-sponsors", "bank-transfer", "grant-contact"]
       },
       {
         "guid": "run-mode-v03",
         "status": "active",
         "name": "argus run — OS sandbox capture (v0.3)",
         "description": "Build argus run <command> CLI sidecar and OS-level transparent HTTP/HTTPS capture via mitmproxy_rs (Linux eBPF, then Windows WinDivert, macOS Network Extension). Includes sandbox session grants, transparent proxy acceptor in Argus core, and doctor/status/traffic commands. Wrapped process trees use existing bucket rewrite rules without per-library proxy wiring.",
-        "amount": 14000,
+        "amount": 25000,
         "currency": "USD",
         "frequency": "one-time",
         "channels": ["bank-transfer", "grant-contact", "github-sponsors"]
       },
       {
+        "guid": "ipc-proxy-hardening",
+        "status": "inactive",
+        "name": "IPC and proxy hardening (pre-audit and post-audit)",
+        "description": "Deferred as a separate line item; scope is included in the security-audit plan. Threat-model updates, grant TTL edge cases, proxy auth binding to peer PID, and signed releases.",
+        "amount": 8000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["github-sponsors", "bank-transfer", "grant-contact"]
+      },
+      {
         "guid": "cli-ecosystem",
-        "status": "active",
+        "status": "inactive",
         "name": "CLI and shell integration",
         "description": "argus get, list, and export shell commands with eval-safe export (no secret values in shell history), advanced tray menus, and docs for CI usage patterns. Extends Argus beyond the desktop UI for scripts and automation.",
         "amount": 5000,
@@ -128,7 +128,7 @@
       },
       {
         "guid": "additional-sdks",
-        "status": "active",
+        "status": "inactive",
         "name": "Go, Ruby, and JVM client libraries",
         "description": "Ship and maintain argus-go, Ruby gem, and Java/JVM client with the same grant + bucket semantics as Python/Node. Go is first priority for backend and CI adopters; Ruby and Java follow documented demand.",
         "amount": 6000,
@@ -138,7 +138,7 @@
       },
       {
         "guid": "self-hosted-foundation",
-        "status": "active",
+        "status": "inactive",
         "name": "Self-hosted team backend (foundation phase)",
         "description": "Initial work toward a self-hosted Argus server: team vault backend scaffold, basic multi-user auth, shared buckets, remote agent/IPC bridge for CI, and organizational audit export. Full SSO/HA/enterprise scope is later roadmap; this plan covers an honest first milestone, not a finished enterprise product.",
         "amount": 12000,
