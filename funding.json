@@ -110,7 +110,7 @@
         "guid": "run-mode-v03",
         "status": "active",
         "name": "argus run — OS sandbox capture (v0.3)",
-        "description": "Implement argus run <command> CLI sidecar, transparent network capture via mitmproxy_rs redirectors (Linux eBPF first, then Windows WinDivert and macOS Network Extension), sandbox session grants for child processes, transparent proxy acceptor in Argus core, and argus doctor/status/traffic commands. Impact: any outbound HTTP/HTTPS from a wrapped process tree goes through existing bucket rewrite rules without per-library proxy wiring (uvicorn --reload, npm scripts, etc.). Does not replace vault or proxy mode — adds a second ingress path.",
+        "description": "Build argus run <command> CLI sidecar and OS-level transparent HTTP/HTTPS capture via mitmproxy_rs (Linux eBPF, then Windows WinDivert, macOS Network Extension). Includes sandbox session grants, transparent proxy acceptor in Argus core, and doctor/status/traffic commands. Wrapped process trees use existing bucket rewrite rules without per-library proxy wiring.",
         "amount": 14000,
         "currency": "USD",
         "frequency": "one-time",
