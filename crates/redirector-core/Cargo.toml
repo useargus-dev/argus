@@ -1,0 +1,16 @@
+[package]
+name = "redirector-core"
+version.workspace = true
+description = "Platform redirector discovery and lifecycle for Argus sandbox"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+intercept = { path = "../intercept" }
+anyhow = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_Registry"] }

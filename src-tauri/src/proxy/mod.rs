@@ -2,7 +2,10 @@ pub mod auth;
 pub mod ca;
 pub mod peer_tcp;
 pub mod rewrite;
+pub mod session;
 pub mod server;
+pub mod tls_sni;
+pub mod transparent;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -13,7 +16,7 @@ use crate::infra::db::buckets;
 use crate::proxy::ca::ensure_ca_material;
 use crate::proxy::server::{start_bucket_proxy, ProxyServerHandle};
 use crate::state::AppState;
-use crate::util::session;
+use crate::util::session as app_session;
 
 pub struct ProxyRuntime {
     servers: Mutex<HashMap<String, ProxyServerHandle>>,
@@ -59,7 +62,7 @@ impl ProxyRuntime {
     pub fn sync_enabled_buckets(app: &AppHandle) -> Result<(), String> {
         let _ = ensure_ca_material().map_err(|e| e.to_string())?;
         let state = app.state::<AppState>();
-        let list: Vec<(String, u16)> = session::with_db(&state, |conn, _inner| {
+        let list: Vec<(String, u16)> = app_session::with_db(&state, |conn, _inner| {
             buckets::list_proxy_enabled_buckets(conn)
         })
         .map_err(|e| e.to_string())?;

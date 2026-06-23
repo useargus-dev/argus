@@ -14,7 +14,7 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_rustls::HttpsConnectorBuilder;
 use rusqlite::Connection;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use tokio_rustls::rustls::ClientConfig;
@@ -28,12 +28,52 @@ use crate::proxy::auth::{authenticate_proxy_headers, verify_grant};
 use crate::proxy::ca::{self, upstream_root_store};
 use crate::proxy::peer_tcp::peer_pid_from_stream;
 use crate::proxy::rewrite::{rewrite_body, rewrite_headers};
+use crate::proxy::transparent;
 use crate::state::AppState;
+use protocol::capture_log;
+use protocol::relay_frame;
 use tauri::Manager;
+
+const TLS_HANDSHAKE: u8 = 0x16;
+
+/// First-byte routing for shared bucket listener (library vs transparent).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncomingRoute {
+    TransparentTls,
+    MaybeHttp,
+    NotImplemented,
+}
+
+pub fn route_incoming_first_byte(b: u8) -> IncomingRoute {
+    if b == TLS_HANDSHAKE {
+        IncomingRoute::TransparentTls
+    } else if b == b'C' || b == b'c' {
+        IncomingRoute::MaybeHttp
+    } else {
+        IncomingRoute::NotImplemented
+    }
+}
 
 pub struct BucketProxyContext {
     pub bucket_id: String,
     pub app: tauri::AppHandle,
+}
+
+#[derive(Clone)]
+pub struct MitmAuditMeta {
+    pub session_id: Option<String>,
+    pub capture_mode: &'static str,
+    pub pid: Option<u32>,
+}
+
+impl Default for MitmAuditMeta {
+    fn default() -> Self {
+        Self {
+            session_id: None,
+            capture_mode: "explicit",
+            pid: None,
+        }
+    }
 }
 
 pub struct ProxyServerHandle {
@@ -71,7 +111,6 @@ fn upstream_client() -> &'static UpstreamClient {
 }
 
 /// Start a per-bucket proxy on a background thread with its own Tokio runtime.
-/// Must not use `tokio::spawn` from sync Tauri commands — there is no runtime on the main thread.
 pub fn start_bucket_proxy(
     app: tauri::AppHandle,
     bucket_id: String,
@@ -134,33 +173,125 @@ async fn run_listener(
 }
 
 async fn handle_client(mut stream: TcpStream, ctx: Arc<BucketProxyContext>) -> io::Result<()> {
-    let headers = read_http_headers(&mut stream).await?;
-    if headers.is_empty() {
+    let peer = stream.peer_addr().ok();
+    let peer_loopback = peer.map(|a| a.ip().is_loopback()).unwrap_or(false);
+
+    let mut first = [0u8; 1];
+    let n = stream.read(&mut first).await?;
+    if n == 0 {
         return Ok(());
     }
-    let method = headers
-        .first()
-        .map(|l| l.split_whitespace().next().unwrap_or(""))
-        .unwrap_or("");
-    if method.eq_ignore_ascii_case("CONNECT") {
-        handle_connect(stream, &headers, ctx).await
+
+    capture_log::log(
+        "proxy",
+        format!(
+            "accepted from {:?} first_byte=0x{:02x}",
+            peer, first[0]
+        ),
+    );
+
+    let relay_pid = if peer_loopback && first[0] == relay_frame::first_byte() {
+        let mut rest = [0u8; relay_frame::HEADER_LEN - 1];
+        if stream.read_exact(&mut rest).await.is_err() {
+            capture_log::log("proxy", "relay header truncated");
+            return Ok(());
+        }
+        let mut hdr = [0u8; relay_frame::HEADER_LEN];
+        hdr[0] = first[0];
+        hdr[1..].copy_from_slice(&rest);
+        match relay_frame::decode(&hdr) {
+            Some(pid) => {
+                let mut tls_first = [0u8; 1];
+                if stream.read_exact(&mut tls_first).await.is_err() {
+                    capture_log::log("proxy", "TLS byte missing after relay header");
+                    return Ok(());
+                }
+                first = tls_first;
+                capture_log::log("proxy", format!("relay header ok pid={pid}"));
+                Some(pid)
+            }
+            None => {
+                capture_log::log("proxy", "invalid relay header magic");
+                stream
+                    .write_all(b"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n")
+                    .await?;
+                return Ok(());
+            }
+        }
     } else {
-        handle_plain_http(stream, &headers, ctx).await
+        None
+    };
+
+    if first[0] == TLS_HANDSHAKE {
+        let record = read_tls_first_record(&mut stream, first[0]).await?;
+        capture_log::log(
+            "proxy",
+            format!(
+                "transparent TLS record {} B relay_pid={relay_pid:?}",
+                record.len()
+            ),
+        );
+        return transparent::handle_transparent(record, stream, ctx, relay_pid).await;
     }
+
+    if first[0] == b'C' || first[0] == b'c' {
+        let headers = read_http_headers_prefixed(&mut stream, vec![first[0]]).await?;
+        if headers.is_empty() {
+            return Ok(());
+        }
+        let method = headers
+            .first()
+            .map(|l| l.split_whitespace().next().unwrap_or(""))
+            .unwrap_or("");
+        if method.eq_ignore_ascii_case("CONNECT") {
+            return handle_connect(stream, &headers, ctx).await;
+        }
+        return handle_plain_http(stream, &headers, ctx).await;
+    }
+
+    stream
+        .write_all(b"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n")
+        .await
 }
 
-async fn read_http_headers<S: AsyncRead + Unpin>(stream: &mut S) -> io::Result<Vec<String>> {
-    let mut buf = Vec::new();
-    let mut chunk = [0u8; 1];
+fn tls_record_len16(b: &[u8]) -> usize {
+    u16::from_be_bytes([b[0], b[1]]) as usize
+}
+
+async fn read_tls_first_record(stream: &mut TcpStream, first: u8) -> io::Result<Vec<u8>> {
+    let mut buf = vec![first];
+    while buf.len() < 5 {
+        let mut c = [0u8; 1];
+        stream.read_exact(&mut c).await?;
+        buf.push(c[0]);
+    }
+    let record_len = tls_record_len16(&buf[3..5]);
+    let total = 5 + record_len;
+    while buf.len() < total && buf.len() < 64 * 1024 {
+        let mut chunk = vec![0u8; (total - buf.len()).min(4096)];
+        let n = stream.read(&mut chunk).await?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
+    Ok(buf)
+}
+
+async fn read_http_headers_prefixed(
+    stream: &mut TcpStream,
+    mut buf: Vec<u8>,
+) -> io::Result<Vec<String>> {
     loop {
-        stream.read_exact(&mut chunk).await?;
-        buf.push(chunk[0]);
         if buf.len() >= 4 && &buf[buf.len() - 4..] == b"\r\n\r\n" {
             break;
         }
         if buf.len() > 64 * 1024 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "headers too large"));
         }
+        let mut c = [0u8; 1];
+        stream.read_exact(&mut c).await?;
+        buf.push(c[0]);
     }
     let text = String::from_utf8_lossy(&buf);
     Ok(text.lines().map(|l| l.to_string()).collect())
@@ -258,13 +389,21 @@ async fn handle_connect(
     let entries = Arc::new(entries);
     let host_c = host.clone();
     let ctx_c = ctx.clone();
+    let audit_meta = MitmAuditMeta {
+        session_id: None,
+        capture_mode: "explicit",
+        pid,
+    };
     let service = service_fn(move |req: Request<Incoming>| {
         let entries = entries.clone();
         let host = host_c.clone();
         let ctx = ctx_c.clone();
         let started = started;
+        let audit_meta = audit_meta.clone();
         async move {
-            Ok::<_, hyper::Error>(handle_mitm_request(req, entries, host, ctx, started).await)
+            Ok::<_, hyper::Error>(
+                handle_mitm_request(req, entries, host, ctx, started, audit_meta).await,
+            )
         }
     });
 
@@ -277,7 +416,7 @@ async fn handle_connect(
     Ok(())
 }
 
-fn proxy_error_response(status: StatusCode) -> Response<Full<bytes::Bytes>> {
+pub(crate) fn proxy_error_response(status: StatusCode) -> Response<Full<bytes::Bytes>> {
     Response::builder()
         .status(status)
         .body(Full::new(bytes::Bytes::new()))
@@ -328,7 +467,7 @@ fn build_upstream_request(
     builder.body(Full::new(body)).map_err(|_| ())
 }
 
-fn build_mitm_response(
+pub(crate) fn build_mitm_response(
     status: StatusCode,
     headers: &hyper::HeaderMap,
     body: bytes::Bytes,
@@ -350,12 +489,13 @@ fn build_mitm_response(
         .unwrap_or_else(|_| proxy_error_response(StatusCode::BAD_GATEWAY))
 }
 
-async fn handle_mitm_request(
+pub async fn handle_mitm_request(
     mut req: Request<Incoming>,
     entries: Arc<Vec<bucket_mappings::ProxyRewriteEntry>>,
     host: String,
     ctx: Arc<BucketProxyContext>,
     started: Instant,
+    audit_meta: MitmAuditMeta,
 ) -> Response<Full<bytes::Bytes>> {
     let method = req.method().clone();
     let method_str = method.as_str().to_string();
@@ -401,6 +541,7 @@ async fn handle_mitm_request(
     };
 
     let elapsed_ms = started.elapsed().as_millis() as u64;
+    let pid = audit_meta.pid.unwrap_or(0);
 
     let _ = with_db(&ctx, |conn, _| {
         audit::proxy_request(
@@ -412,7 +553,9 @@ async fn handle_mitm_request(
             used_label.as_deref(),
             status.as_u16(),
             elapsed_ms,
-            0,
+            pid,
+            audit_meta.session_id.as_deref(),
+            audit_meta.capture_mode,
         )
     });
 
@@ -431,7 +574,7 @@ async fn handle_plain_http(
         .await
 }
 
-fn with_db<T, F>(ctx: &BucketProxyContext, f: F) -> Result<T, ()>
+pub fn with_db<T, F>(ctx: &BucketProxyContext, f: F) -> Result<T, ()>
 where
     F: FnOnce(&Connection, &[u8; 32]) -> AppResult<T>,
 {
@@ -441,4 +584,33 @@ where
     let vk = inner.value_key().ok_or(())?;
     let conn = pool.lock().map_err(|_| ())?;
     f(&conn, &vk).map_err(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tls_record_len_parsing() {
+        assert_eq!(tls_record_len16(&[0x01, 0x00]), 256);
+        assert_eq!(tls_record_len16(&[0x01, 0x7c]), 380);
+    }
+
+    #[test]
+    fn connect_target_parsing() {
+        assert_eq!(
+            connect_target("CONNECT api.example.com:443 HTTP/1.1"),
+            Some("api.example.com:443".to_string())
+        );
+    }
+
+    #[test]
+    fn first_byte_routes_connect_and_tls() {
+        assert_eq!(
+            route_incoming_first_byte(0x16),
+            IncomingRoute::TransparentTls
+        );
+        assert_eq!(route_incoming_first_byte(b'C'), IncomingRoute::MaybeHttp);
+        assert_eq!(route_incoming_first_byte(b'G'), IncomingRoute::NotImplemented);
+    }
 }

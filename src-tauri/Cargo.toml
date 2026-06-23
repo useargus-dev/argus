@@ -25,6 +25,7 @@ path = "src/bin/reset_db.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+protocol = { path = "../crates/protocol" }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }

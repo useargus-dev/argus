@@ -1,58 +1,21 @@
-use std::collections::HashMap;
+//! Re-export shared IPC protocol types from `protocol`.
 
-use serde::{Deserialize, Serialize};
+pub use protocol::*;
 
-#[derive(Debug, Deserialize)]
-pub struct IpcRequest {
-    pub request_id: String,
-    pub bucket_id: String,
-    pub client_token: String,
-    /// Optional fallback cwd (used on Windows when OS can't read peer cwd).
-    #[serde(default)]
-    pub cwd: Option<String>,
-}
+// Legacy alias used by desktop IPC server.
+pub type IpcRequest = IpcFetchEnvRequest;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProxyConfigPayload {
-    pub enabled: bool,
-    pub http_proxy: String,
-    pub https_proxy: String,
-    pub no_proxy: String,
-    pub ca_bundle_path: String,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Debug, Serialize)]
-#[serde(tag = "status", rename_all = "lowercase")]
-pub enum IpcResponse {
-    Ok {
-        request_id: String,
-        env: HashMap<String, String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        proxy: Option<ProxyConfigPayload>,
-    },
-    Denied {
-        request_id: String,
-        /// `APPROVAL_DENIED` or `APPROVAL_TIMEOUT`
-        code: String,
-        message: String,
-    },
-    Locked {
-        request_id: String,
-        message: String,
-    },
-    Error {
-        request_id: String,
-        code: String,
-        message: String,
-    },
-}
-
-impl IpcResponse {
-    pub fn to_line(&self) -> String {
-        serde_json::to_string(self).unwrap_or_else(|_| {
-            r#"{"status":"error","request_id":"","code":"SERIALIZE_ERROR","message":"response encode failed"}"#
-                .to_string()
-        })
+    #[test]
+    fn parses_sandbox_revoke() {
+        let line = r#"{"type":"sandbox_revoke","request_id":"r1","session_id":"sess_abc"}"#;
+        let parsed = parse_incoming(line).unwrap();
+        match parsed {
+            ParsedIpcRequest::SandboxRevoke(req) => assert_eq!(req.session_id, "sess_abc"),
+            _ => panic!("expected sandbox_revoke"),
+        }
     }
 }

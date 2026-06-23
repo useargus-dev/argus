@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "cli",
+    "crates/protocol",
+    "crates/ipc-client",
+    "crates/process-tree",
+    "crates/intercept",
+    "crates/redirector-core",
+    "redirector-linux",
+    "redirector-windows",
+]
+
+[workspace.package]
+version = "0.2.1"
+edition = "2021"
+rust-version = "1.88"
+license = "AGPL-3.0-or-later"
+
+[workspace.dependencies]
+mitmproxy = { path = "third_party/mitmproxy_rs" }
+tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net", "process", "signal"] }
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.11"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1.23", features = ["v4"] }
+dirs = "6.0"

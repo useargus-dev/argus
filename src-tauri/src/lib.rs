@@ -4,7 +4,7 @@ mod infra;
 pub use infra::db as db;
 mod error;
 mod ipc;
-mod proxy;
+pub mod proxy;
 mod register;
 mod sessions;
 mod state;

@@ -1,4 +1,4 @@
-# Compiles and tests the Tauri Rust backend (src-tauri/).
+# Compiles and tests the Argus Rust workspace.
 
 name: Tauri
 
@@ -18,27 +18,51 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: src-tauri
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Tauri system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf clang llvm libbpf-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
-      - name: Compile Tauri backend
-        run: cargo check --all-targets
+      - name: Compile workspace
+        run: cargo check --workspace --all-targets
 
-      - name: Test Tauri backend
-        run: cargo test --all-targets
+      - name: Test Argus desktop
+        run: cargo test -p argus
+
+      - name: Test shared crates
+        run: |
+          cargo test -p protocol
+          cargo test -p ipc-client
+          cargo test -p process-tree
+
+  sidecars-linux:
+    name: sidecars-linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - name: Install BPF build deps
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+      - name: Build Linux sidecars
+        run: |
+          cargo build --release -p argus-cli -p argus-redirector-linux
+
+  sidecars-windows:
+    name: sidecars-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - name: Build Windows sidecars
+        run: cargo build --release -p argus-cli -p argus-redirector-windows
