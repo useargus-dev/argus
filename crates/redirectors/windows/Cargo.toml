@@ -19,7 +19,7 @@ ProductName = "Argus Redirector"
 FileDescription = "Argus OS-level network capture redirector"
 
 [dependencies]
-protocol = { path = "../crates/protocol" }
+protocol = { path = "../../protocol" }
 mitmproxy = { workspace = true }
 tokio = { version = "1.52", features = ["macros", "net", "rt-multi-thread", "sync", "io-util", "time"] }
 anyhow = { version = "1.0.102", features = ["backtrace"] }

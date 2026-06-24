@@ -247,13 +247,13 @@ dependencies = [
  "clap",
  "dotenvy",
  "env_logger",
+ "intercept",
  "ipc-client",
  "libc",
  "log",
  "nix 0.29.0",
  "process-tree",
  "protocol",
- "redirector-core",
  "serde",
  "serde_json",
  "tokio",
@@ -5117,17 +5117,6 @@ dependencies = [
  "time",
  "x509-parser",
  "yasna",
-]
-
-[[package]]
-name = "redirector-core"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "intercept",
- "log",
- "tokio",
- "windows-sys 0.59.0",
 ]
 
 [[package]]

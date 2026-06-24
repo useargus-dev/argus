@@ -47,27 +47,21 @@ pub struct SandboxRevokeRequest {
     pub session_id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum IpcSandboxRequest {
-    SandboxCreate {
-        request_id: String,
-        bucket_id: String,
-        client_token: String,
-        #[serde(default)]
-        cwd: Option<String>,
-        #[serde(default)]
-        command_preview: Option<String>,
-    },
-    SandboxRegisterPids {
-        request_id: String,
-        session_id: String,
-        pids: Vec<u32>,
-    },
-    SandboxRevoke {
-        request_id: String,
-        session_id: String,
-    },
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SandboxListRequest {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub request_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxSessionInfo {
+    pub session_id: String,
+    pub bucket_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command_preview: Option<String>,
+    pub expires_at: String,
+    pub pids: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +90,8 @@ pub enum IpcResponse {
         expires_at: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none", alias = "caBundlePath")]
         ca_bundle_path: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sessions: Option<Vec<SandboxSessionInfo>>,
     },
     Denied {
         request_id: String,
@@ -128,6 +124,7 @@ pub enum ParsedIpcRequest {
     SandboxCreate(SandboxCreateRequest),
     SandboxRegisterPids(SandboxRegisterPidsRequest),
     SandboxRevoke(SandboxRevokeRequest),
+    SandboxList(SandboxListRequest),
     Unknown {
         request_id: String,
         msg_type: String,
@@ -150,6 +147,10 @@ pub fn parse_incoming(line: &str) -> Result<ParsedIpcRequest, serde_json::Error>
             "sandbox_revoke" => {
                 let req: SandboxRevokeRequest = serde_json::from_value(value)?;
                 Ok(ParsedIpcRequest::SandboxRevoke(req))
+            }
+            "sandbox_list" => {
+                let req: SandboxListRequest = serde_json::from_value(value)?;
+                Ok(ParsedIpcRequest::SandboxList(req))
             }
             other => Ok(ParsedIpcRequest::Unknown {
                 request_id: value
@@ -192,6 +193,7 @@ mod tests {
             proxy_port: Some(9000),
             expires_at: Some("2026-01-01T00:00:00Z".into()),
             ca_bundle_path: Some("/tmp/ca.pem".into()),
+            sessions: None,
         };
         let line = resp.to_line();
         assert!(line.contains("session_id"));

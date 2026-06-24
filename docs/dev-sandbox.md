@@ -8,7 +8,7 @@ How to run the desktop app and CLI sidecar together during development.
 |----------|--------------|------|
 | Desktop app | `target/debug/argus.exe` (package `argus`) | IPC server + transparent proxy |
 | CLI | `target/debug/argus-cli.exe` (package `argus-cli`) | `argus run` sidecar |
-| Redirector | `target/debug/argus-redirector-windows.exe` | OS capture (Windows) |
+| Redirector | `target/debug/argus-redirector-windows.exe` (`crates/redirectors/windows`) | OS capture (Windows) |
 
 The CLI and desktop **must** have different binary names so `cargo build` does not overwrite the Tauri app.
 

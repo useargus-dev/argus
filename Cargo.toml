@@ -7,9 +7,8 @@ members = [
     "crates/ipc-client",
     "crates/process-tree",
     "crates/intercept",
-    "crates/redirector-core",
-    "redirector-linux",
-    "redirector-windows",
+    "crates/redirectors/linux",
+    "crates/redirectors/windows",
 ]
 
 [workspace.package]

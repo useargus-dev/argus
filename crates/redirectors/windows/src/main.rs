@@ -1,3 +1,5 @@
+//! Argus WinDivert redirector (fork of mitmproxy-windows redirector with Argus capture logging).
+//! Upstream reference: mitmproxy_rs mitmproxy-windows/redirector
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};

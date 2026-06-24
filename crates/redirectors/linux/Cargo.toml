@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 mitmproxy = { workspace = true }
-mitmproxy-linux-ebpf-common = { path = "../third_party/mitmproxy_rs/mitmproxy-linux-ebpf-common" }
+mitmproxy-linux-ebpf-common = { path = "../../../third_party/mitmproxy_rs/mitmproxy-linux-ebpf-common" }
 tun = { version = "0.8.5", features = ["async"] }
 aya = { version = "0.13.0", default-features = false }
 aya-log = { version = "0.2.1", default-features = false }
@@ -29,5 +29,5 @@ const-sha1 = "0.3.0"
 [build-dependencies]
 anyhow = { version = "1.0.100", features = ["backtrace"] }
 aya-build = "0.1.3"
-mitmproxy-linux-ebpf = { path = "../third_party/mitmproxy_rs/mitmproxy-linux-ebpf" }
+mitmproxy-linux-ebpf = { path = "../../../third_party/mitmproxy_rs/mitmproxy-linux-ebpf" }
 cargo_metadata = { version = "0.23.1", default-features = false }

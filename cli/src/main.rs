@@ -47,8 +47,6 @@ async fn run() -> anyhow::Result<()> {
         None => cmd::status::run(cmd::status::StatusArgs::default()).await,
         Some(Commands::Run(args)) => cmd::run::run(args).await,
         Some(Commands::Status(args)) => cmd::status::run(args).await,
-        Some(Commands::Sessions) => {
-            anyhow::bail!("argus sessions: not yet implemented (M5+)")
-        }
+        Some(Commands::Sessions) => cmd::sessions::run().await,
     }
 }

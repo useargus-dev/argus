@@ -1,14 +1,16 @@
+mod flow_parse;
+
 use std::{fs, iter};
 use std::fs::Permissions;
 use anyhow::Context;
 use anyhow::anyhow;
 use anyhow::Result;
 use aya::{Ebpf, EbpfLoader};
-use aya::maps::Array;
+use aya::maps::{Array, HashMap as BpfHashMap};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use aya::Btf;
-use aya::programs::{links::CgroupAttachMode, CgroupSock};
+use aya::programs::{links::CgroupAttachMode, CgroupSock, CgroupSockConnect4};
 use log::{debug, warn, info, error};
 use prost::bytes::{Bytes, BytesMut};
 use tokio::net::UnixDatagram;
@@ -16,20 +18,21 @@ use tokio::select;
 use mitmproxy::packet_sources::tun::create_tun_device;
 use tun::AbstractDevice;
 use prost::Message;
-use tokio::io::AsyncReadExt;
 use tokio::signal::unix::{signal, SignalKind};
-use mitmproxy::ipc::{PacketWithMeta, from_proxy};
+use mitmproxy::ipc::{PacketWithMeta, from_proxy, TunnelInfo};
 use mitmproxy::ipc::FromProxy;
 use mitmproxy::packet_sources::IPC_BUF_SIZE;
-use mitmproxy_linux_ebpf_common::{Action, INTERCEPT_CONF_LEN};
+use mitmproxy_linux_ebpf_common::{Action, FlowKey, INTERCEPT_CONF_LEN};
 
-// We can't implement aya::Pod in mitmproxy-linux-ebpf-common, so we do it on a newtype.
-// (see https://github.com/aya-rs/aya/pull/59)
+use crate::flow_parse::flow_key_from_ipv4_packet;
+
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 struct ActionWrapper(Action);
 
 unsafe impl aya::Pod for ActionWrapper {}
+
+unsafe impl aya::Pod for FlowKey {}
 
 const BPF_PROG: &[u8] = aya::include_bytes_aligned!(concat!(env!("OUT_DIR"), "/mitmproxy-linux"));
 const BPF_HASH: [u8; 20] = const_sha1::sha1(BPF_PROG).as_bytes();
@@ -42,25 +45,38 @@ fn load_bpf(device_index: u32) -> Result<Ebpf> {
         .load(BPF_PROG)
         .context("failed to load eBPF program")?;
     if let Err(e) = aya_log::EbpfLogger::init(&mut ebpf) {
-        // This can happen if you remove all log statements from your eBPF program.
         warn!("failed to initialize eBPF logger: {e}");
     }
 
-    debug!("Attaching BPF_CGROUP_INET_SOCK_CREATE program...");
-    let prog: &mut CgroupSock = ebpf.program_mut("cgroup_sock_create").context("failed to get cgroup_sock_create")?.try_into()?;
-    // root cgroup to get all events.
     let cgroup = fs::File::open("/sys/fs/cgroup/").context("failed to open \"/sys/fs/cgroup/\"")?;
+
+    debug!("Attaching BPF_CGROUP_INET_SOCK_CREATE program...");
+    let prog: &mut CgroupSock = ebpf
+        .program_mut("cgroup_sock_create")
+        .context("failed to get cgroup_sock_create")?
+        .try_into()?;
     prog.load().context("failed to load cgroup_sock_create program")?;
-    prog.attach(&cgroup, CgroupAttachMode::Single).context("failed to attach cgroup_sock_create program")?;
+    prog.attach(&cgroup, CgroupAttachMode::Single)
+        .context("failed to attach cgroup_sock_create program")?;
+
+    debug!("Attaching BPF_CGROUP_INET4_CONNECT program...");
+    let connect: &mut CgroupSockConnect4 = ebpf
+        .program_mut("cgroup_connect4")
+        .context("failed to get cgroup_connect4")?
+        .try_into()?;
+    connect
+        .load()
+        .context("failed to load cgroup_connect4 program")?;
+    connect
+        .attach(&cgroup, CgroupAttachMode::Single)
+        .context("failed to attach cgroup_connect4 program")?;
+
     Ok(ebpf)
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    )
-        //.format_target(false)
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp(None)
         .init();
 
@@ -81,9 +97,16 @@ async fn main() -> anyhow::Result<()> {
 
     let mut ebpf = load_bpf(device_index).context("eBPF initialization failed")?;
 
-    debug!("Getting INTERCEPT_CONF map...");
+    let mut flow_pid = {
+        let map = ebpf
+            .map_mut("FLOW_PID")
+            .context("couldn't get FLOW_PID map")?;
+        BpfHashMap::<_, FlowKey, u32>::try_from(map).context("Cannot cast FLOW_PID to HashMap")?
+    };
+
     let mut intercept_conf = {
-        let map = ebpf.map_mut("INTERCEPT_CONF")
+        let map = ebpf
+            .map_mut("INTERCEPT_CONF")
             .context("couldn't get INTERCEPT_CONF map")?;
         Array::<_, ActionWrapper>::try_from(map)
             .context("Cannot cast INTERCEPT_CONF to Array")?
@@ -98,10 +121,13 @@ async fn main() -> anyhow::Result<()> {
     fs::set_permissions(&redirector_addr, Permissions::from_mode(0o777))?;
     println!("{}", redirector_addr.to_string_lossy());
 
-    // Exit cleanly on SIGINT/SIGTERM
     tokio::spawn(async {
-        let mut sigint = signal(SignalKind::interrupt()).context("failed to register SIGINT listener").unwrap();
-        let mut sigterm = signal(SignalKind::terminate()).context("failed to register SIGTERM listener").unwrap();
+        let mut sigint = signal(SignalKind::interrupt())
+            .context("failed to register SIGINT listener")
+            .unwrap();
+        let mut sigterm = signal(SignalKind::terminate())
+            .context("failed to register SIGTERM listener")
+            .unwrap();
         select! {
             _ = sigint.recv() => (),
             _ = sigterm.recv() => (),
@@ -121,11 +147,9 @@ async fn main() -> anyhow::Result<()> {
                         let Ok(FromProxy { message: Some(message)}) = FromProxy::decode(ipc_buf.as_slice()) else {
                             return Err(anyhow!("Received invalid IPC message: {:?}", &ipc_buf[..len]));
                         };
-                        // debug!("Received IPC message: {message:?}");
 
                         match message {
                             from_proxy::Message::Packet(packet) => {
-                                // debug!("Forwarding Packet to device: {}", packet.data.len());
                                 device.send(&packet.data).await.context("failed to send packet")?;
                             }
                             from_proxy::Message::InterceptConf(conf) => {
@@ -151,20 +175,18 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             },
-            // ... or process incoming packets
             r = device.read_buf(&mut dev_buf) => {
                 r.context("TUN read() failed")?;
-
+                let data = dev_buf.split().freeze();
+                let tunnel_info = lookup_tunnel_info(&data, &mut flow_pid);
                 let packet = PacketWithMeta {
-                    data: dev_buf.split().freeze(),
-                    tunnel_info: None,
+                    data,
+                    tunnel_info,
                 };
 
                 packet.encode(&mut ipc_buf)?;
-                // debug!("Sending packet to proxy: {} {:?}", encoded.len(), &encoded);
                 ipc.send(ipc_buf.as_slice()).await?;
 
-                // Reclaim space in dev_buf.
                 drop(packet);
                 assert!(dev_buf.try_reclaim(IPC_BUF_SIZE));
             },
@@ -172,8 +194,18 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Bump the memlock rlimit. This is needed for older kernels that don't use the
-/// new memcg based accounting, see https://lwn.net/Articles/837122/
+fn lookup_tunnel_info(
+    data: &Bytes,
+    flow_pid: &mut BpfHashMap<aya::maps::MapData, FlowKey, u32>,
+) -> Option<TunnelInfo> {
+    let key = flow_key_from_ipv4_packet(data)?;
+    let pid = flow_pid.get(&key, 0).ok().flatten()?;
+    Some(TunnelInfo {
+        pid: Some(pid),
+        process_name: None,
+    })
+}
+
 fn bump_memlock_rlimit() {
     let rlim = libc::rlimit {
         rlim_cur: libc::RLIM_INFINITY,
@@ -185,7 +217,6 @@ fn bump_memlock_rlimit() {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +226,4 @@ mod tests {
     async fn bpf_load() {
         load_bpf(0).unwrap();
     }
-
 }

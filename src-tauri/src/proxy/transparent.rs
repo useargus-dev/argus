@@ -15,7 +15,7 @@ use tokio_rustls::TlsAcceptor;
 
 use crate::infra::db::audit;
 use crate::infra::db::bucket_mappings;
-use crate::infra::db::sandbox_sessions;
+use crate::sandbox::cache::lookup_session_by_pid;
 use crate::proxy::ca;
 use crate::proxy::peer_tcp::peer_pid_from_stream;
 use crate::proxy::server::{
@@ -115,9 +115,9 @@ pub fn evaluate_transparent_gate(
             reason: "no_pid",
         };
     };
-    let session = match sandbox_sessions::lookup_active_session_by_pid(conn, pid) {
-        Ok(Some(s)) if s.bucket_id == bucket_id => s,
-        Ok(_) | Err(_) => {
+    let session = match lookup_session_by_pid(conn, bucket_id, pid) {
+        Ok(Some(s)) => s,
+        Ok(None) | Err(_) => {
             return TransparentGateResult::Deny {
                 pid: Some(pid),
                 reason: "session_or_sni",
@@ -140,15 +140,8 @@ pub fn evaluate_transparent_gate(
             reason: "host_denied",
         };
     }
-    let entries = match bucket_mappings::list_proxy_rewrite_entries(conn, bucket_id, vk, &host) {
-        Ok(e) => e,
-        Err(_) => {
-            return TransparentGateResult::Deny {
-                pid: Some(pid),
-                reason: "session_or_sni",
-            };
-        }
-    };
+    let entries = bucket_mappings::list_proxy_rewrite_entries(conn, bucket_id, vk, &host)
+        .unwrap_or_default();
     TransparentGateResult::Ok(TransparentGateOk {
         session_id: session.id,
         host,
@@ -291,11 +284,16 @@ pub async fn handle_transparent(
 mod tests {
     use super::*;
     use crate::infra::db::meta::run_migrations;
+    use crate::infra::db::sandbox_sessions;
+    use crate::sandbox::cache::SessionCache;
     use chrono::Utc;
     use rusqlite::{params, Connection};
     use uuid::Uuid;
 
     fn mem_conn() -> Connection {
+        if let Ok(mut cache) = SessionCache::global().lock() {
+            cache.clear();
+        }
         let conn = Connection::open_in_memory().unwrap();
         run_migrations(&conn).unwrap();
         conn
@@ -303,6 +301,7 @@ mod tests {
 
     fn seed_bucket(conn: &Connection, allowed_hosts: &str) -> String {
         let id = Uuid::new_v4().to_string();
+        let map_id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         conn.execute(
             "INSERT INTO app_buckets (id, name, client_token_hash, client_token_enc,
@@ -310,6 +309,13 @@ mod tests {
              created_at, updated_at)
              VALUES (?1, 'test', x'00', x'00', 60, 1, 1, 9001, ?2, ?3, ?3)",
             params![id, allowed_hosts, now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO bucket_mappings (id, bucket_id, env_label, mapping_type, text_value,
+             proxy_enabled, allowed_hosts, created_at)
+             VALUES (?1, ?2, 'API_KEY', 'text', '', 1, ?3, ?4)",
+            params![map_id, id, allowed_hosts, now],
         )
         .unwrap();
         id

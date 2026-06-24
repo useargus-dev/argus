@@ -48,7 +48,23 @@ NODE_EXTRA_CA_CERTS=...
 
 ## Hot reload (uvicorn `--reload`)
 
-The CLI registers the root PID and watches the process tree; new worker PIDs are registered via IPC automatically.
+The CLI registers the root PID and watches the process tree. New worker PIDs are registered via IPC and the redirector intercept spec is updated (`Include PID` list) without restarting the full proxy stack.
+
+## Single approval
+
+`sandbox_create` prompts once for `argus run`. Child processes inherit the session: `fetch_env` from SDK `load_env()` / `loadEnv()` skips a second prompt when the caller PID is registered on an active sandbox session (or when `ARGUS_SANDBOX=1` is set client-side).
+
+## Linux PID path
+
+On Linux, eBPF records the connecting process in a `FLOW_PID` map at `connect4` time. The redirector looks up the IPv4 5-tuple when reading TUN packets and attaches `tunnel_info.pid` to relay frames so the transparent gate can authorize traffic.
+
+## List active sessions
+
+```bash
+argus sessions
+```
+
+Requires a signed-in desktop app with an active CLI grant (same as other IPC commands).
 
 ## Limitations
 

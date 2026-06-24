@@ -5,6 +5,7 @@ pub use infra::db as db;
 mod error;
 mod ipc;
 pub mod proxy;
+mod sandbox;
 mod register;
 mod sessions;
 mod state;

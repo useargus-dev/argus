@@ -1,15 +1,7 @@
-//! Resolve bundled redirector binaries and start/stop capture.
+#[cfg(windows)]
+use crate::registry_win;
 
 use std::path::{Path, PathBuf};
-
-use anyhow::Result;
-#[cfg(target_os = "linux")]
-use intercept::{start_linux_redirector, RedirectorHandle};
-#[cfg(windows)]
-use intercept::{start_windows_redirector, RedirectorHandle};
-
-#[cfg(windows)]
-mod registry_win;
 
 pub fn argus_home() -> PathBuf {
     if let Ok(home) = std::env::var("ARGUS_HOME") {
@@ -26,14 +18,8 @@ pub fn argus_home() -> PathBuf {
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
-            // Dev layout: target/release/argus-cli + lib/argus/
             let lib = parent.join("lib").join("argus");
             if lib.exists() {
-                return parent.to_path_buf();
-            }
-            // Tauri bundle: Resources/lib/argus
-            let resources = parent.join("lib").join("argus");
-            if resources.exists() {
                 return parent.to_path_buf();
             }
         }
@@ -60,21 +46,27 @@ pub fn windows_redirector_path() -> PathBuf {
     redirector_dir().join("argus-redirector-windows.exe")
 }
 
-pub fn privilege_hint() -> Option<String> {
-    intercept::elevation_notice()
+pub fn intercept_spec_for_pid(root_pid: u32) -> String {
+    root_pid.to_string()
+}
+
+pub fn intercept_spec_for_pids(pids: &[u32]) -> String {
+    pids.iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub async fn start_redirector(
     target_port: u16,
     redirector_override: Option<&Path>,
-) -> Result<RedirectorHandle> {
+) -> anyhow::Result<crate::RedirectorHandle> {
     #[cfg(target_os = "linux")]
     {
         let path = redirector_override
             .map(Path::to_path_buf)
             .unwrap_or_else(linux_redirector_path);
-        let handle = start_linux_redirector(path, target_port).await?;
-        Ok(handle)
+        crate::start_linux_redirector(path, target_port).await
     }
 
     #[cfg(windows)]
@@ -82,8 +74,7 @@ pub async fn start_redirector(
         let path = redirector_override
             .map(Path::to_path_buf)
             .unwrap_or_else(windows_redirector_path);
-        let handle = start_windows_redirector(path, target_port).await?;
-        Ok(handle)
+        crate::start_windows_redirector(path, target_port).await
     }
 
     #[cfg(not(any(target_os = "linux", windows)))]
@@ -91,8 +82,4 @@ pub async fn start_redirector(
         let _ = (target_port, redirector_override);
         anyhow::bail!("argus run is not supported on this platform yet")
     }
-}
-
-pub fn intercept_spec_for_pid(root_pid: u32) -> String {
-    root_pid.to_string()
 }

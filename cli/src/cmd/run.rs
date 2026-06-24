@@ -1,13 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use ipc_client::{
     sandbox_create, sandbox_register_pids, sandbox_revoke, DEFAULT_TIMEOUT, IpcClientError,
 };
+use intercept::{
+    elevation_notice, intercept_spec_for_pids, start_redirector,
+};
 use process_tree::spawn_watcher;
-use redirector_core::{intercept_spec_for_pid, start_redirector};
 use clap::Args;
 use tokio::process::Command;
 
@@ -73,7 +76,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
         std::process::exit(code);
     }
 
-    if let Some(notice) = redirector_core::privilege_hint() {
+    if let Some(notice) = elevation_notice() {
         eprintln!("⚠ {notice}");
     }
 
@@ -93,10 +96,14 @@ pub async fn run(args: RunArgs) -> Result<()> {
             redirector_path.display()
         ),
     );
-    let redirector = start_redirector(session.proxy_port, Some(&redirector_path))
-        .await
-        .context("failed to start network redirector")?;
+    let redirector = Arc::new(
+        start_redirector(session.proxy_port, Some(&redirector_path))
+            .await
+            .context("failed to start network redirector")?,
+    );
     capture_log::log("run", "redirector IPC connected");
+
+    let tracked_pids: Arc<Mutex<HashSet<u32>>> = Arc::new(Mutex::new(HashSet::new()));
 
     let mut child_env = session.env.clone();
     apply_sandbox_env(&mut child_env, &session.ca_bundle_path, &session.session_id);
@@ -117,10 +124,19 @@ pub async fn run(args: RunArgs) -> Result<()> {
     let root_pid = child.id().unwrap_or(0);
     capture_log::log("run", format!("spawned child pid={root_pid}"));
 
-    redirector
-        .set_intercept(&intercept_spec_for_pid(root_pid))
-        .context("failed to set intercept spec")?;
-    capture_log::log("run", format!("redirector intercept spec: Include PID {root_pid}"));
+    {
+        let mut pids = tracked_pids.lock().unwrap();
+        pids.insert(root_pid);
+        redirector
+            .set_intercept(&intercept_spec_for_pids(
+                &pids.iter().copied().collect::<Vec<_>>(),
+            ))
+            .context("failed to set intercept spec")?;
+        capture_log::log(
+            "run",
+            format!("redirector intercept spec: Include PID {root_pid}"),
+        );
+    }
 
     sandbox_register_pids(&session.session_id, &[root_pid], DEFAULT_TIMEOUT)
         .map_err(map_ipc_error)?;
@@ -130,12 +146,25 @@ pub async fn run(args: RunArgs) -> Result<()> {
     );
 
     let session_id = session.session_id.clone();
-    let _watcher = spawn_watcher(root_pid, move |fresh| {
+    let pids_for_watcher = tracked_pids.clone();
+    let redirector_for_watcher = redirector.clone();
+    let watcher = spawn_watcher(root_pid, move |fresh| {
         let _ = sandbox_register_pids(&session_id, &fresh, DEFAULT_TIMEOUT);
+        if let Ok(mut pids) = pids_for_watcher.lock() {
+            for pid in &fresh {
+                pids.insert(*pid);
+            }
+            let spec = intercept_spec_for_pids(&pids.iter().copied().collect::<Vec<_>>());
+            let _ = redirector_for_watcher.set_intercept(&spec);
+        }
     });
 
     let exit_code = wait_with_signals(&mut child).await?;
-    redirector.stop().await;
+    watcher.stop();
+    match Arc::try_unwrap(redirector) {
+        Ok(r) => r.stop().await,
+        Err(_) => {}
+    }
     let _ = sandbox_revoke(&session.session_id, DEFAULT_TIMEOUT);
     std::process::exit(exit_code);
 }
@@ -146,7 +175,7 @@ fn print_dry_run(bucket_id: &str, args: &RunArgs) -> Result<()> {
     println!("  Env file:   {}", args.env.display());
     println!("  ARGUS_HOME: {}", argus_home().display());
     println!("  Redirector: {}", redirector_path().display());
-    if let Some(notice) = redirector_core::privilege_hint() {
+    if let Some(notice) = elevation_notice() {
         println!("  Privilege:  {notice}");
     } else {
         println!("  Privilege:  OK (already elevated)");

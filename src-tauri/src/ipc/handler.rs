@@ -1,23 +1,24 @@
 use std::sync::Arc;
-use std::time::Duration;
 
-use chrono::Utc;
-use tauri::{AppHandle, Emitter, Manager};
-use tokio::time::timeout;
+use tauri::{AppHandle, Manager};
 
 use crate::error::AppError;
-use crate::infra::db::{audit, buckets, client_grants, ipc_env, sandbox_sessions};
+use crate::infra::db::{buckets, client_grants, ipc_env};
 use crate::ipc::peer::VerifiedClient;
 use crate::ipc::protocol::{
     parse_incoming, IpcRequest, IpcResponse, ParsedIpcRequest, ProxyConfigPayload,
-    SandboxCreateRequest, SandboxRegisterPidsRequest, SandboxRevokeRequest,
+    SandboxCreateRequest, SandboxListRequest, SandboxRegisterPidsRequest, SandboxRevokeRequest,
+    SandboxSessionInfo,
 };
 use crate::messages;
 use crate::proxy::ProxyRuntime;
-use crate::sessions::{ClientAccessRequestEvent, PendingApprovalStore, PendingDecision};
+use crate::sandbox::approval::{request_client_grant, GrantInsertDetails, GrantRequest};
+use crate::sandbox::cache::lookup_session_by_pid;
+use crate::sandbox::service::{
+    create_sandbox_session, list_active_sessions, register_session_pids, revoke_sandbox_session,
+};
+use crate::sessions::PendingApprovalStore;
 use crate::state::AppState;
-
-const APPROVAL_WAIT_SECS: u64 = 120;
 
 pub async fn handle_request(
     app: &AppHandle,
@@ -42,6 +43,7 @@ pub async fn handle_request(
         ParsedIpcRequest::SandboxCreate(r) => r.request_id.clone(),
         ParsedIpcRequest::SandboxRegisterPids(r) => r.request_id.clone(),
         ParsedIpcRequest::SandboxRevoke(r) => r.request_id.clone(),
+        ParsedIpcRequest::SandboxList(r) => r.request_id.clone(),
         ParsedIpcRequest::Unknown { request_id, .. } => request_id.clone(),
     };
 
@@ -80,6 +82,7 @@ pub async fn handle_request(
             process_sandbox_register_pids(&state, peer, req).await
         }
         ParsedIpcRequest::SandboxRevoke(req) => process_sandbox_revoke(&state, req).await,
+        ParsedIpcRequest::SandboxList(req) => process_sandbox_list(&state, req).await,
         ParsedIpcRequest::Unknown { request_id, msg_type } => Ok(IpcResponse::Error {
             request_id,
             code: "INVALID_REQUEST".into(),
@@ -89,12 +92,24 @@ pub async fn handle_request(
 
     match result {
         Ok(resp) => resp.to_line(),
-        Err(e) => IpcResponse::Error {
-            request_id,
-            code: e.code().to_string(),
-            message: e.to_string(),
+        Err(e) => {
+            let code = e.code().to_string();
+            if code == "APPROVAL_DENIED" || code == "APPROVAL_TIMEOUT" {
+                IpcResponse::Denied {
+                    request_id,
+                    code,
+                    message: e.to_string(),
+                }
+                .to_line()
+            } else {
+                IpcResponse::Error {
+                    request_id,
+                    code,
+                    message: e.to_string(),
+                }
+                .to_line()
+            }
         }
-        .to_line(),
     }
 }
 
@@ -111,6 +126,13 @@ async fn process_fetch_env(
 
     let (bucket_name, access_ttl, existing_env) = with_session_db(state, |conn, value_key| {
         let meta = buckets::verify_client_token(conn, &req.bucket_id, &req.client_token)?;
+
+        if let Some(session) = lookup_session_by_pid(conn, &req.bucket_id, peer.pid)? {
+            let env = ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)?;
+            let _ = session;
+            return Ok((meta.name, meta.access_ttl_minutes, Some(env)));
+        }
+
         let ttl = client_grants::access_ttl_minutes(conn, meta.access_ttl_minutes)?;
 
         if let Some(grant) =
@@ -134,86 +156,48 @@ async fn process_fetch_env(
             proxy_port: None,
             expires_at: None,
             ca_bundle_path: None,
+            sessions: None,
         });
     }
 
-    let event = ClientAccessRequestEvent {
-        request_id: request_id.clone(),
-        bucket_id: req.bucket_id.clone(),
-        bucket_name,
-        fingerprint: fingerprint.clone(),
-        pid: peer.pid,
-        exe_path: peer.exe_path.clone(),
-        cwd: peer.cwd.clone(),
-        cwd_verified: peer.cwd_verified,
-        run_args: peer.run_args.clone(),
-        git_remote: peer.git_remote.clone(),
-        process_name: peer.process_name.clone(),
-        machine_id: peer.machine_id.clone(),
-        access_ttl_minutes: access_ttl,
-        created_at: Utc::now().to_rfc3339(),
-    };
-
-    let (rx, event_clone) = pending_store.register(event);
-    let _ = app.emit("client-access-requested", event_clone.clone());
-    show_requests_window(app);
-
-    let decision = match timeout(Duration::from_secs(APPROVAL_WAIT_SECS), rx).await {
-        Ok(Ok(d)) => d,
-        Ok(Err(_)) => PendingDecision::Deny,
-        Err(_) => {
-            pending_store.respond(&request_id, PendingDecision::Deny);
-            return Ok(IpcResponse::Denied {
-                request_id,
-                code: "APPROVAL_TIMEOUT".into(),
-                message: messages::approval_timeout().into(),
-            });
-        }
-    };
-
-    match decision {
-        PendingDecision::Deny => Ok(IpcResponse::Denied {
-            request_id,
-            code: "APPROVAL_DENIED".into(),
-            message: messages::approval_denied().into(),
-        }),
-        PendingDecision::Accept { ttl_minutes } => {
-            let ttl = if ttl_minutes > 0 {
-                ttl_minutes
-            } else {
-                access_ttl
-            };
-            let details = client_grants::GrantDetails {
+    request_client_grant(
+        app,
+        pending_store,
+        state,
+        GrantRequest {
+            request_id: &request_id,
+            bucket_id: &req.bucket_id,
+            bucket_name: &bucket_name,
+            client_token: &req.client_token,
+            fingerprint,
+            access_ttl,
+            peer,
+            client_label: None,
+            grant_details: GrantInsertDetails {
                 cwd: Some(peer.cwd.clone()),
                 exe_path: Some(peer.exe_path.clone()),
                 git_remote: peer.git_remote.clone(),
                 run_args: Some(peer.run_args.clone()),
-            };
-            let env = with_session_db(state, |conn, value_key| {
-                client_grants::insert_grant(
-                    conn,
-                    &req.bucket_id,
-                    fingerprint,
-                    &req.client_token,
-                    ttl,
-                    Some(&peer.process_name),
-                    Some(&details),
-                )?;
-                ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)
-            })?;
-            touch_activity(state);
-            let proxy = proxy_payload(state, &req.bucket_id, &req.client_token)?;
-            Ok(IpcResponse::Ok {
-                request_id,
-                env,
-                proxy,
-                session_id: None,
-                proxy_port: None,
-                expires_at: None,
-                ca_bundle_path: None,
-            })
-        }
-    }
+            },
+        },
+    )
+    .await?;
+
+    let env = with_session_db(state, |conn, value_key| {
+        ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)
+    })?;
+    touch_activity(state);
+    let proxy = proxy_payload(state, &req.bucket_id, &req.client_token)?;
+    Ok(IpcResponse::Ok {
+        request_id,
+        env,
+        proxy,
+        session_id: None,
+        proxy_port: None,
+        expires_at: None,
+        ca_bundle_path: None,
+        sessions: None,
+    })
 }
 
 async fn process_sandbox_create(
@@ -225,7 +209,7 @@ async fn process_sandbox_create(
 ) -> Result<IpcResponse, AppError> {
     let request_id = req.request_id.clone();
     let fingerprint = peer.fingerprint.clone();
-    let token_hash = buckets::hash_token(&req.client_token);
+    let _token_hash = buckets::hash_token(&req.client_token);
 
     let proxy_check = with_session_db(state, |conn, _| {
         let meta = buckets::verify_client_token(conn, &req.bucket_id, &req.client_token)?;
@@ -243,51 +227,46 @@ async fn process_sandbox_create(
 
     let (bucket_name, access_ttl, proxy_port) = proxy_check;
 
-    let grant_id = ensure_grant_for_sandbox(
+    let grant_id = request_client_grant(
         app,
         pending_store,
         state,
-        peer,
-        &req,
-        &bucket_name,
-        access_ttl,
-        &fingerprint,
-        &token_hash,
+        GrantRequest {
+            request_id: &request_id,
+            bucket_id: &req.bucket_id,
+            bucket_name: &bucket_name,
+            client_token: &req.client_token,
+            fingerprint: &fingerprint,
+            access_ttl,
+            peer,
+            client_label: Some("argus run"),
+            grant_details: GrantInsertDetails {
+                cwd: Some(peer.cwd.clone()),
+                exe_path: Some(peer.exe_path.clone()),
+                git_remote: peer.git_remote.clone(),
+                run_args: req.command_preview.clone(),
+            },
+        },
     )
     .await?;
 
     let (session, env, ca_bundle_path) = with_session_db(state, |conn, value_key| {
         let ttl = client_grants::access_ttl_minutes(conn, access_ttl)?;
-        let session = sandbox_sessions::create_session(
+        create_sandbox_session(
             conn,
+            value_key,
             &req.bucket_id,
             &grant_id,
             &fingerprint,
             req.command_preview.as_deref(),
             ttl,
-        )?;
-        sandbox_sessions::register_pids(conn, &session.id, &[peer.pid])?;
-        let env = ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)?;
-        let ca_bundle_path = ipc_env::resolve_proxy_config(conn, &req.bucket_id, &req.client_token)?
-            .map(|c| c.ca_bundle_path)
-            .unwrap_or_else(|| {
-                crate::infra::db::argus_dir()
-                    .join("ca-bundle.pem")
-                    .to_string_lossy()
-                    .into_owned()
-            });
-        audit::sandbox_session_created(
-            conn,
-            &req.bucket_id,
-            &session.id,
-            req.command_preview.as_deref(),
+            peer.pid,
             proxy_port,
-        )?;
-        audit::sandbox_pid_registered(conn, &req.bucket_id, &session.id, &[peer.pid])?;
-        Ok((session, env, ca_bundle_path))
+            &req.client_token,
+        )
     })?;
 
-    let _ = ProxyRuntime::sync_enabled_buckets(app);
+    let _ = ProxyRuntime::ensure_bucket_running(app, &req.bucket_id, proxy_port);
     touch_activity(state);
 
     Ok(IpcResponse::Ok {
@@ -298,92 +277,8 @@ async fn process_sandbox_create(
         env,
         ca_bundle_path: Some(ca_bundle_path),
         proxy: None,
+        sessions: None,
     })
-}
-
-async fn ensure_grant_for_sandbox(
-    app: &AppHandle,
-    pending_store: &Arc<PendingApprovalStore>,
-    state: &tauri::State<'_, AppState>,
-    peer: &VerifiedClient,
-    req: &SandboxCreateRequest,
-    bucket_name: &str,
-    access_ttl: i64,
-    fingerprint: &str,
-    token_hash: &str,
-) -> Result<String, AppError> {
-    let existing = with_session_db(state, |conn, _| {
-        client_grants::find_active_grant(conn, &req.bucket_id, fingerprint, token_hash)
-    })?;
-    if let Some(grant) = existing {
-        with_session_db(state, |conn, _| client_grants::touch_grant(conn, &grant.id))?;
-        return Ok(grant.id);
-    }
-
-    let event = ClientAccessRequestEvent {
-        request_id: req.request_id.clone(),
-        bucket_id: req.bucket_id.clone(),
-        bucket_name: bucket_name.to_string(),
-        fingerprint: fingerprint.to_string(),
-        pid: peer.pid,
-        exe_path: peer.exe_path.clone(),
-        cwd: peer.cwd.clone(),
-        cwd_verified: peer.cwd_verified,
-        run_args: peer.run_args.clone(),
-        git_remote: peer.git_remote.clone(),
-        process_name: peer.process_name.clone(),
-        machine_id: peer.machine_id.clone(),
-        access_ttl_minutes: access_ttl,
-        created_at: Utc::now().to_rfc3339(),
-    };
-
-    let (rx, event_clone) = pending_store.register(event);
-    let _ = app.emit("client-access-requested", event_clone);
-    show_requests_window(app);
-
-    let decision = match timeout(Duration::from_secs(APPROVAL_WAIT_SECS), rx).await {
-        Ok(Ok(d)) => d,
-        Ok(Err(_)) => PendingDecision::Deny,
-        Err(_) => {
-            pending_store.respond(&req.request_id, PendingDecision::Deny);
-            return Err(AppError::message(
-                "GRANT_REQUIRED",
-                messages::approval_timeout(),
-            ));
-        }
-    };
-
-    match decision {
-        PendingDecision::Deny => Err(AppError::message(
-            "GRANT_REQUIRED",
-            messages::approval_denied(),
-        )),
-        PendingDecision::Accept { ttl_minutes } => {
-            let ttl = if ttl_minutes > 0 {
-                ttl_minutes
-            } else {
-                access_ttl
-            };
-            let details = client_grants::GrantDetails {
-                cwd: Some(peer.cwd.clone()),
-                exe_path: Some(peer.exe_path.clone()),
-                git_remote: peer.git_remote.clone(),
-                run_args: req.command_preview.clone(),
-            };
-            let grant_id = with_session_db(state, |conn, _| {
-                client_grants::insert_grant(
-                    conn,
-                    &req.bucket_id,
-                    fingerprint,
-                    &req.client_token,
-                    ttl,
-                    Some("argus run"),
-                    Some(&details),
-                )
-            })?;
-            Ok(grant_id)
-        }
-    }
 }
 
 async fn process_sandbox_register_pids(
@@ -391,13 +286,7 @@ async fn process_sandbox_register_pids(
     peer: &VerifiedClient,
     req: SandboxRegisterPidsRequest,
 ) -> Result<IpcResponse, AppError> {
-    with_session_db(state, |conn, _| {
-        let session = sandbox_sessions::get_session(conn, &req.session_id)?
-            .ok_or_else(|| AppError::message("SESSION_NOT_FOUND", "sandbox session not found"))?;
-        sandbox_sessions::register_pids(conn, &req.session_id, &req.pids)?;
-        audit::sandbox_pid_registered(conn, &session.bucket_id, &req.session_id, &req.pids)?;
-        Ok(())
-    })?;
+    with_session_db(state, |conn, _| register_session_pids(conn, &req.session_id, &req.pids))?;
     let _ = peer;
     Ok(IpcResponse::Ok {
         request_id: req.request_id,
@@ -407,6 +296,7 @@ async fn process_sandbox_register_pids(
         proxy_port: None,
         expires_at: None,
         ca_bundle_path: None,
+        sessions: None,
     })
 }
 
@@ -414,18 +304,7 @@ async fn process_sandbox_revoke(
     state: &tauri::State<'_, AppState>,
     req: SandboxRevokeRequest,
 ) -> Result<IpcResponse, AppError> {
-    with_session_db(state, |conn, _| {
-        let session = sandbox_sessions::get_session(conn, &req.session_id)?
-            .ok_or_else(|| AppError::message("SESSION_NOT_FOUND", "sandbox session not found"))?;
-        if !sandbox_sessions::revoke_session(conn, &req.session_id)? {
-            return Err(AppError::message(
-                "SESSION_NOT_FOUND",
-                "sandbox session not found",
-            ));
-        }
-        audit::sandbox_session_revoked(conn, &session.bucket_id, &req.session_id)?;
-        Ok(())
-    })?;
+    with_session_db(state, |conn, _| revoke_sandbox_session(conn, &req.session_id))?;
     Ok(IpcResponse::Ok {
         request_id: req.request_id,
         env: Default::default(),
@@ -434,6 +313,34 @@ async fn process_sandbox_revoke(
         proxy_port: None,
         expires_at: None,
         ca_bundle_path: None,
+        sessions: None,
+    })
+}
+
+async fn process_sandbox_list(
+    state: &tauri::State<'_, AppState>,
+    req: SandboxListRequest,
+) -> Result<IpcResponse, AppError> {
+    let sessions = with_session_db(state, |conn, _| list_active_sessions(conn))?;
+    let sessions = sessions
+        .into_iter()
+        .map(|s| SandboxSessionInfo {
+            session_id: s.session_id,
+            bucket_id: s.bucket_id,
+            command_preview: s.command_preview,
+            expires_at: s.expires_at,
+            pids: s.pids,
+        })
+        .collect();
+    Ok(IpcResponse::Ok {
+        request_id: req.request_id,
+        env: Default::default(),
+        proxy: None,
+        session_id: None,
+        proxy_port: None,
+        expires_at: None,
+        ca_bundle_path: None,
+        sessions: Some(sessions),
     })
 }
 
@@ -479,8 +386,4 @@ fn touch_activity(state: &tauri::State<'_, AppState>) {
     if let Ok(inner) = state.0.lock() {
         inner.touch_activity();
     }
-}
-
-fn show_requests_window(app: &AppHandle) {
-    crate::show_requests_window(app);
 }

@@ -2,7 +2,6 @@ pub mod auth;
 pub mod ca;
 pub mod peer_tcp;
 pub mod rewrite;
-pub mod session;
 pub mod server;
 pub mod tls_sni;
 pub mod transparent;
@@ -57,6 +56,24 @@ impl ProxyRuntime {
                 h.stop();
             }
         }
+    }
+
+    /// Start the bucket proxy listener if not already running.
+    pub fn ensure_bucket_running(
+        app: &AppHandle,
+        bucket_id: &str,
+        port: u16,
+    ) -> Result<(), String> {
+        let proxy = app.state::<ProxyRuntime>();
+        let already = proxy
+            .servers
+            .lock()
+            .map_err(|_| "proxy lock poisoned".to_string())?
+            .contains_key(bucket_id);
+        if already {
+            return Ok(());
+        }
+        proxy.start_bucket(app, bucket_id, port)
     }
 
     pub fn sync_enabled_buckets(app: &AppHandle) -> Result<(), String> {

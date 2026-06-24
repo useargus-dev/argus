@@ -543,6 +543,8 @@ Full threat analysis: [security.md](./security.md).
 
 ## 11. IPC & Socket Server **(shipped)**
 
+> **Schema:** Run `node scripts/generate-ipc-schema.mjs` to refresh [`ipc-schema.json`](./ipc-schema.json). TypeScript and Python SDKs should track `crates/protocol` and this schema for sandbox IPC (`sandbox_create`, `sandbox_list`, etc.).
+
 Socket server runs while the user is **signed in** (starts on sign-in, stops on sign-out). The main window may be hidden; IPC stays up when **Run in background** is enabled.
 
 ### 11.1 Request (client → Argus) — v3 protocol

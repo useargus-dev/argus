@@ -16,6 +16,7 @@ fn mem_conn() -> Connection {
 
 fn seed_bucket(conn: &Connection) -> String {
     let id = Uuid::new_v4().to_string();
+    let map_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO app_buckets (id, name, client_token_hash, client_token_enc,
@@ -23,6 +24,13 @@ fn seed_bucket(conn: &Connection) -> String {
          created_at, updated_at)
          VALUES (?1, 'test', x'00', x'00', 60, 1, 1, 9001, '[\"api.example.com\"]', ?2, ?2)",
         params![id, now],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO bucket_mappings (id, bucket_id, env_label, mapping_type, text_value,
+         proxy_enabled, allowed_hosts, created_at)
+         VALUES (?1, ?2, 'API', 'text', '', 1, '[\"api.example.com\"]', ?3)",
+        params![map_id, id, now],
     )
     .unwrap();
     id

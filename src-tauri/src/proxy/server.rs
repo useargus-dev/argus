@@ -589,6 +589,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use protocol::relay_frame;
 
     #[test]
     fn tls_record_len_parsing() {
@@ -602,6 +603,21 @@ mod tests {
             connect_target("CONNECT api.example.com:443 HTTP/1.1"),
             Some("api.example.com:443".to_string())
         );
+    }
+
+    #[test]
+    fn relay_header_peel_before_tls() {
+        let pid = 35_096u32;
+        let hdr = relay_frame::encode(pid);
+        assert_eq!(hdr[0], relay_frame::first_byte());
+        assert_eq!(relay_frame::decode(&hdr), Some(pid));
+        let mut combined = hdr.to_vec();
+        combined.push(0x16);
+        assert_eq!(
+            relay_frame::decode(&combined[..relay_frame::HEADER_LEN]),
+            Some(pid)
+        );
+        assert_eq!(combined[relay_frame::HEADER_LEN], 0x16);
     }
 
     #[test]

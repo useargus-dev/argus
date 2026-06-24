@@ -1,6 +1,8 @@
-//! Walk process trees and watch for new child PIDs (uvicorn --reload).
+//! Walk process trees and watch for new child PIDs (uvicorn `--reload`).
 
 use std::collections::{HashSet, VecDeque};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -27,16 +29,44 @@ pub fn descendants(root: u32) -> Result<Vec<u32>, ProcessTreeError> {
     Ok(all.into_iter().collect())
 }
 
+pub struct WatcherHandle {
+    stop: Arc<AtomicBool>,
+    join: Option<thread::JoinHandle<()>>,
+}
+
+impl WatcherHandle {
+    pub fn stop(mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+impl Drop for WatcherHandle {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
 /// Spawn a background watcher; calls `on_new` when new PIDs appear under `root`.
-pub fn spawn_watcher<F>(root: u32, mut on_new: F) -> thread::JoinHandle<()>
+pub fn spawn_watcher<F>(root: u32, mut on_new: F) -> WatcherHandle
 where
     F: FnMut(Vec<u32>) + Send + 'static,
 {
-    thread::spawn(move || {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_flag = stop.clone();
+    let join = thread::spawn(move || {
         let mut known = descendants(root).unwrap_or_else(|_| vec![root]);
         let mut known_set: HashSet<u32> = known.iter().copied().collect();
         loop {
+            if stop_flag.load(Ordering::Relaxed) {
+                break;
+            }
             thread::sleep(Duration::from_millis(500));
+            if stop_flag.load(Ordering::Relaxed) {
+                break;
+            }
             let current = descendants(root).unwrap_or_default();
             let fresh: Vec<u32> = current
                 .into_iter()
@@ -47,7 +77,11 @@ where
                 on_new(fresh);
             }
         }
-    })
+    });
+    WatcherHandle {
+        stop,
+        join: Some(join),
+    }
 }
 
 #[cfg(unix)]
@@ -88,7 +122,9 @@ fn direct_children(pid: u32) -> Result<Vec<u32>, ProcessTreeError> {
     unsafe {
         let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snap == INVALID_HANDLE_VALUE {
-            return Err(ProcessTreeError::Walk("CreateToolhelp32Snapshot failed".into()));
+            return Err(ProcessTreeError::Walk(
+                "CreateToolhelp32Snapshot failed".into(),
+            ));
         }
         let mut entry: PROCESSENTRY32W = std::mem::zeroed();
         entry.dwSize = size_of::<PROCESSENTRY32W>() as u32;

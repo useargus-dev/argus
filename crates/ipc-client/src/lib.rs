@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use protocol::{
-    IpcFetchEnvRequest, IpcResponse, ProxyConfigPayload,
+    IpcFetchEnvRequest, IpcResponse, ProxyConfigPayload, SandboxListRequest, SandboxSessionInfo,
     SandboxCreateRequest, SandboxRegisterPidsRequest, SandboxRevokeRequest,
 };
 use thiserror::Error;
@@ -45,6 +45,15 @@ pub struct SandboxCreateResult {
     pub expires_at: String,
     pub env: HashMap<String, String>,
     pub ca_bundle_path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SandboxSessionListItem {
+    pub session_id: String,
+    pub bucket_id: String,
+    pub command_preview: Option<String>,
+    pub expires_at: String,
+    pub pids: Vec<u32>,
 }
 
 /// Human-readable IPC endpoint (Unix socket path or Windows pipe name).
@@ -291,6 +300,27 @@ pub fn sandbox_revoke(session_id: &str, timeout: Duration) -> Result<(), IpcClie
     };
     match send_json(&req, timeout)? {
         IpcResponse::Ok { .. } => Ok(()),
+        _ => Err(IpcClientError::InvalidResponse("unexpected response".into())),
+    }
+}
+
+pub fn sandbox_list(timeout: Duration) -> Result<Vec<SandboxSessionListItem>, IpcClientError> {
+    let req = SandboxListRequest {
+        msg_type: "sandbox_list".into(),
+        request_id: Uuid::new_v4().to_string(),
+    };
+    match send_json(&req, timeout)? {
+        IpcResponse::Ok { sessions: Some(list), .. } => Ok(list
+            .into_iter()
+            .map(|s: SandboxSessionInfo| SandboxSessionListItem {
+                session_id: s.session_id,
+                bucket_id: s.bucket_id,
+                command_preview: s.command_preview,
+                expires_at: s.expires_at,
+                pids: s.pids,
+            })
+            .collect()),
+        IpcResponse::Ok { .. } => Ok(vec![]),
         _ => Err(IpcClientError::InvalidResponse("unexpected response".into())),
     }
 }
