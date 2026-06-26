@@ -7,9 +7,9 @@ Every **standard Argus desktop install** ships the CLI and platform redirector a
 | Platform | CLI | Redirector |
 |----------|-----|------------|
 | Linux | `/usr/local/bin/argus` (symlink from `argus-cli`) | `$ARGUS_HOME/lib/argus/argus-redirector-linux` |
-| Windows | `%ProgramFiles%\Argus\bin\argus.exe` (from bundled `argus-cli`) | `%ProgramFiles%\Argus\lib\argus\argus-redirector-windows.exe` + WinDivert |
+| Windows | `%ProgramFiles%\Argus\bin\argus.exe` or `%LOCALAPPDATA%\argus\bin\argus.exe` (from bundled `argus-cli.exe`) | `{ARGUS_HOME}/lib/argus/argus-redirector-windows.exe` + WinDivert |
 
-`ARGUS_HOME` defaults to the desktop install directory. Windows also sets `HKLM\Software\Argus\InstallPath`.
+`ARGUS_HOME` defaults to the desktop install directory. Windows sets `InstallPath` under `HKCU` (per-user install) and/or `HKLM` (per-machine install). The NSIS installer adds `bin` to the user PATH always, and to machine PATH for per-machine installs.
 
 ## Standalone install scripts
 

@@ -15,7 +15,7 @@ use tokio_rustls::TlsAcceptor;
 
 use crate::infra::db::audit;
 use crate::infra::db::bucket_mappings;
-use crate::sandbox::cache::lookup_session_by_pid;
+use crate::sandbox::gate::{self, PidVerifyFailure};
 use crate::proxy::ca;
 use crate::proxy::peer_tcp::peer_pid_from_stream;
 use crate::proxy::server::{
@@ -23,6 +23,9 @@ use crate::proxy::server::{
 };
 use crate::proxy::tls_sni::sni_from_client_hello;
 use protocol::capture_log;
+
+/// Transparent MITM path: authorized by active sandbox session + registered PID + boot ID.
+/// CONNECT proxy auth (see [`crate::proxy::auth`]) uses client grants instead.
 
 const TLS_HANDSHAKE: u8 = 0x16;
 
@@ -115,12 +118,24 @@ pub fn evaluate_transparent_gate(
             reason: "no_pid",
         };
     };
-    let session = match lookup_session_by_pid(conn, bucket_id, pid) {
-        Ok(Some(s)) => s,
-        Ok(None) | Err(_) => {
+    let session = match gate::verify_registered_pid(conn, bucket_id, pid) {
+        Ok(s) => s,
+        Err(PidVerifyFailure::NotRegistered) => {
             return TransparentGateResult::Deny {
                 pid: Some(pid),
                 reason: "session_or_sni",
+            };
+        }
+        Err(PidVerifyFailure::GrantInactive) => {
+            return TransparentGateResult::Deny {
+                pid: Some(pid),
+                reason: "grant_inactive",
+            };
+        }
+        Err(PidVerifyFailure::BootIdMismatch) => {
+            return TransparentGateResult::Deny {
+                pid: Some(pid),
+                reason: "boot_id_mismatch",
             };
         }
     };
@@ -286,7 +301,9 @@ mod tests {
     use crate::infra::db::meta::run_migrations;
     use crate::infra::db::sandbox_sessions;
     use crate::sandbox::cache::SessionCache;
+    use crate::util::process_identity::process_boot_id;
     use chrono::Utc;
+    use protocol::test_fixtures::minimal_client_hello_with_sni;
     use rusqlite::{params, Connection};
     use uuid::Uuid;
 
@@ -321,43 +338,28 @@ mod tests {
         id
     }
 
-    fn minimal_client_hello_with_sni(host: &str) -> Vec<u8> {
-        // TLS record header + minimal ClientHello with SNI extension for `host`.
-        let mut hello = vec![
-            0x03, 0x03, // version
-        ];
-        hello.extend_from_slice(&[0u8; 32]); // random
-        hello.push(0); // session id len
-        hello.extend_from_slice(&[0, 2, 0x00, 0x2f]); // cipher suites
-        hello.push(1); // compression
-        hello.push(0); // comp method
-        let host_bytes = host.as_bytes();
-        let sni_list_len = 3 + host_bytes.len();
-        let ext_len = 2 + sni_list_len;
-        let mut exts = Vec::new();
-        exts.extend_from_slice(&[0x00, 0x00]); // server_name ext type
-        exts.extend_from_slice(&(ext_len as u16).to_be_bytes());
-        exts.extend_from_slice(&(sni_list_len as u16).to_be_bytes());
-        exts.push(0); // host_name type
-        exts.extend_from_slice(&(host_bytes.len() as u16).to_be_bytes());
-        exts.extend_from_slice(host_bytes);
-        hello.extend_from_slice(&(exts.len() as u16).to_be_bytes());
-        hello.extend_from_slice(&exts);
-        let hello_len = hello.len();
-        let mut body = vec![0x01]; // ClientHello
-        body.extend_from_slice(&(hello_len as u32).to_be_bytes()[1..]); // 3-byte len
-        body.extend_from_slice(&hello);
-        let record_len = body.len();
-        let mut record = vec![0x16, 0x03, 0x01];
-        record.extend_from_slice(&(record_len as u16).to_be_bytes());
-        record.extend_from_slice(&body);
-        record
+    fn seed_grant(conn: &Connection, bucket_id: &str, grant_id: &str) {
+        let now = Utc::now().to_rfc3339();
+        let exp = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        conn.execute(
+            "INSERT INTO client_grants (id, bucket_id, fingerprint, token_hash, granted_at, expires_at, last_seen_at)
+             VALUES (?1, ?2, 'fp', 'hash', ?3, ?4, ?3)",
+            params![grant_id, bucket_id, now, exp],
+        )
+        .unwrap();
+    }
+
+    fn register_live_pid(conn: &Connection, session_id: &str, pid: u32) {
+        let boot_id = process_boot_id(pid).expect("test pid must be readable");
+        sandbox_sessions::register_pids(conn, session_id, &[(pid, boot_id)]).unwrap();
     }
 
     #[test]
     fn gate_allows_registered_pid_and_host() {
         let conn = mem_conn();
         let bucket_id = seed_bucket(&conn, r#"["api.example.com"]"#);
+        seed_grant(&conn, &bucket_id, "grant-1");
+        let pid = std::process::id();
         let session = sandbox_sessions::create_session(
             &conn,
             &bucket_id,
@@ -367,12 +369,12 @@ mod tests {
             60,
         )
         .unwrap();
-        sandbox_sessions::register_pids(&conn, &session.id, &[4242]).unwrap();
+        register_live_pid(&conn, &session.id, pid);
         let vk = [0u8; 32];
         let prefix = minimal_client_hello_with_sni("api.example.com");
-        match evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(4242), &prefix) {
+        match evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix) {
             TransparentGateResult::Ok(ok) => assert_eq!(ok.session_id, session.id),
-            TransparentGateResult::Deny { .. } => panic!("expected allow"),
+            TransparentGateResult::Deny { reason, .. } => panic!("expected allow, got {reason}"),
         }
     }
 
@@ -392,6 +394,8 @@ mod tests {
     fn gate_denies_host_not_in_allowlist() {
         let conn = mem_conn();
         let bucket_id = seed_bucket(&conn, r#"["allowed.com"]"#);
+        seed_grant(&conn, &bucket_id, "grant-1");
+        let pid = std::process::id();
         let session = sandbox_sessions::create_session(
             &conn,
             &bucket_id,
@@ -401,11 +405,11 @@ mod tests {
             60,
         )
         .unwrap();
-        sandbox_sessions::register_pids(&conn, &session.id, &[4242]).unwrap();
+        register_live_pid(&conn, &session.id, pid);
         let vk = [0u8; 32];
         let prefix = minimal_client_hello_with_sni("blocked.com");
         assert!(matches!(
-            evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(4242), &prefix),
+            evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix),
             TransparentGateResult::Deny {
                 reason: "host_denied",
                 ..
@@ -417,6 +421,8 @@ mod tests {
     fn gate_denies_revoked_session() {
         let conn = mem_conn();
         let bucket_id = seed_bucket(&conn, r#"["api.example.com"]"#);
+        seed_grant(&conn, &bucket_id, "grant-1");
+        let pid = std::process::id();
         let session = sandbox_sessions::create_session(
             &conn,
             &bucket_id,
@@ -426,13 +432,67 @@ mod tests {
             60,
         )
         .unwrap();
-        sandbox_sessions::register_pids(&conn, &session.id, &[4242]).unwrap();
+        register_live_pid(&conn, &session.id, pid);
         sandbox_sessions::revoke_session(&conn, &session.id).unwrap();
         let vk = [0u8; 32];
         let prefix = minimal_client_hello_with_sni("api.example.com");
         assert!(matches!(
-            evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(4242), &prefix),
+            evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix),
             TransparentGateResult::Deny { .. }
+        ));
+    }
+
+    #[test]
+    fn gate_denies_boot_id_mismatch() {
+        let conn = mem_conn();
+        let bucket_id = seed_bucket(&conn, r#"["api.example.com"]"#);
+        seed_grant(&conn, &bucket_id, "grant-1");
+        let pid = std::process::id();
+        let session = sandbox_sessions::create_session(
+            &conn,
+            &bucket_id,
+            "grant-1",
+            "fp",
+            None,
+            60,
+        )
+        .unwrap();
+        sandbox_sessions::register_pids(&conn, &session.id, &[(pid, "stale-boot-id".into())])
+            .unwrap();
+        let vk = [0u8; 32];
+        let prefix = minimal_client_hello_with_sni("api.example.com");
+        assert!(matches!(
+            evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix),
+            TransparentGateResult::Deny {
+                reason: "boot_id_mismatch",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn gate_denies_inactive_grant() {
+        let conn = mem_conn();
+        let bucket_id = seed_bucket(&conn, r#"["api.example.com"]"#);
+        let pid = std::process::id();
+        let session = sandbox_sessions::create_session(
+            &conn,
+            &bucket_id,
+            "grant-expired",
+            "fp",
+            None,
+            60,
+        )
+        .unwrap();
+        register_live_pid(&conn, &session.id, pid);
+        let vk = [0u8; 32];
+        let prefix = minimal_client_hello_with_sni("api.example.com");
+        assert!(matches!(
+            evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix),
+            TransparentGateResult::Deny {
+                reason: "grant_inactive",
+                ..
+            }
         ));
     }
 }

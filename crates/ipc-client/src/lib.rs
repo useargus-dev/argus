@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use protocol::{
-    IpcFetchEnvRequest, IpcResponse, ProxyConfigPayload, SandboxListRequest, SandboxSessionInfo,
-    SandboxCreateRequest, SandboxRegisterPidsRequest, SandboxRevokeRequest,
+    ipc_pipe_name, IpcFetchEnvRequest, IpcResponse, ProxyConfigPayload, SandboxListRequest,
+    SandboxSessionInfo, SandboxCreateRequest, SandboxRegisterPidsRequest, SandboxRevokeRequest,
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -45,6 +45,7 @@ pub struct SandboxCreateResult {
     pub expires_at: String,
     pub env: HashMap<String, String>,
     pub ca_bundle_path: String,
+    pub relay_secret: String,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +60,7 @@ pub struct SandboxSessionListItem {
 /// Human-readable IPC endpoint (Unix socket path or Windows pipe name).
 pub fn ipc_endpoint() -> String {
     if cfg!(windows) {
-        r"\\.\pipe\argus".into()
+        ipc_pipe_name()
     } else {
         socket_path().display().to_string()
     }
@@ -74,7 +75,10 @@ pub fn socket_path() -> PathBuf {
 
 fn connection_hint() -> String {
     if cfg!(windows) {
-        "Is Argus signed in and running? The named pipe \\\\.\\pipe\\argus must exist.".into()
+        format!(
+            "Is Argus signed in and running? The named pipe {} must exist.",
+            ipc_pipe_name()
+        )
     } else {
         format!(
             "Is Argus signed in and running? Expected Unix socket at {}.",
@@ -134,10 +138,11 @@ fn exchange_windows(payload: &str, timeout: Duration) -> Result<String, IpcClien
     let (tx, rx) = mpsc::sync_channel(1);
     thread::spawn(move || {
         let result = (|| -> Result<String, std::io::Error> {
+            let pipe_name = ipc_pipe_name();
             let mut pipe = OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(r"\\.\pipe\argus")?;
+                .open(&pipe_name)?;
             pipe.write_all(payload.as_bytes())?;
             pipe.write_all(b"\n")?;
             let mut reader = BufReader::new(pipe);
@@ -257,6 +262,7 @@ pub fn sandbox_create(
             expires_at,
             env,
             ca_bundle_path,
+            relay_secret,
             ..
         } => Ok(SandboxCreateResult {
             session_id: session_id.ok_or_else(|| {
@@ -270,6 +276,7 @@ pub fn sandbox_create(
             expires_at: expires_at.unwrap_or_default(),
             env,
             ca_bundle_path: ca_bundle_path.unwrap_or_default(),
+            relay_secret: relay_secret.unwrap_or_default(),
         }),
         _ => Err(IpcClientError::InvalidResponse("unexpected response".into())),
     }

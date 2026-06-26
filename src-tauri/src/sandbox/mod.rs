@@ -2,4 +2,7 @@
 
 pub mod approval;
 pub mod cache;
+pub mod db;
+pub mod gate;
+pub mod lifecycle;
 pub mod service;

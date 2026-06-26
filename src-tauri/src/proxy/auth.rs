@@ -6,6 +6,9 @@ use crate::infra::db::client_grants;
 use crate::error::{AppError, AppResult};
 use crate::ipc::VerifiedClient;
 
+/// CONNECT proxy authentication uses client grants (token + fingerprint).
+/// Transparent MITM uses sandbox session PID registration (see [`crate::proxy::transparent`]).
+
 pub fn parse_proxy_token(headers: &[(String, String)]) -> Option<String> {
     for (k, v) in headers {
         if k.eq_ignore_ascii_case("proxy-authorization") {

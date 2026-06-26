@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "argus"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -241,9 +241,10 @@ dependencies = [
 
 [[package]]
 name = "argus-cli"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "clap",
  "dotenvy",
  "env_logger",
@@ -262,7 +263,7 @@ dependencies = [
 
 [[package]]
 name = "argus-redirector-linux"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "aya",
@@ -284,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "argus-redirector-windows"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -3161,9 +3162,10 @@ dependencies = [
 
 [[package]]
 name = "intercept"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "log",
  "mitmproxy",
  "nix 0.29.0",
@@ -3212,7 +3214,7 @@ checksum = "8e537132deb99c0eb4b752f0346b6a836200eaaa3516dd7e5514b63930a09e5d"
 
 [[package]]
 name = "ipc-client"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "libc",
@@ -4865,7 +4867,7 @@ dependencies = [
 
 [[package]]
 name = "process-tree"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "libc",
  "thiserror 2.0.18",
@@ -4929,10 +4931,14 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
+ "hmac 0.12.1",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

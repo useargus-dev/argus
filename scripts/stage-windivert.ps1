@@ -8,25 +8,25 @@ param(
 $ErrorActionPreference = "Stop"
 New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
 
-$candidates = @(
-    (Join-Path $TargetDir "WinDivert.dll"),
-    (Join-Path $TargetDir "WinDivert64.sys")
-)
-
-# windivert-sys may place files under target/release/build/windivert-sys-*/out/
-Get-ChildItem -Path (Join-Path $TargetDir "build") -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -in @("WinDivert.dll", "WinDivert64.sys") } |
-    ForEach-Object { $candidates += $_.FullName }
+function Find-WindivertFile {
+    param([string]$Name, [string]$SearchRoot)
+    $fromBuild = Get-ChildItem -Path (Join-Path $SearchRoot "build") -Recurse -Filter $Name -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($fromBuild) { return $fromBuild.FullName }
+    $direct = Join-Path $SearchRoot $Name
+    if (Test-Path $direct) { return $direct }
+    return $null
+}
 
 foreach ($name in @("WinDivert.dll", "WinDivert64.sys")) {
-    $src = $candidates | Where-Object { $_ -and (Split-Path $_ -Leaf) -eq $name } | Select-Object -First 1
+    $src = Find-WindivertFile -Name $name -SearchRoot $TargetDir
     if (-not $src) {
         Write-Warning "WinDivert: $name not found under $TargetDir (build redirector first)"
         continue
     }
     Copy-Item -Force $src (Join-Path $StageDir $name)
     Copy-Item -Force $src (Join-Path $TargetDir $name)
-    Write-Host "Staged $name"
+    Write-Host "Staged $name from $src"
 }
 
 Write-Host "WinDivert files in: $StageDir"

@@ -1,6 +1,6 @@
 [package]
 name = "argus"
-version = "0.2.1"
+version = "0.3.0"
 description = "Local-first secrets vault for developers"
 authors = ["Argus Contributors"]
 license = "AGPL-3.0-or-later"
@@ -76,11 +76,12 @@ libc = "0.2"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
   "Win32_System_Pipes",
   "Win32_System_Registry",
   "Win32_System_RemoteDesktop",
   "Win32_System_Threading",
-  "Win32_Security",
   "Win32_NetworkManagement_IpHelper",
   "Win32_Networking_WinSock",
 ] }

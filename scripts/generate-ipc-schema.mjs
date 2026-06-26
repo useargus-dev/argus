@@ -51,6 +51,7 @@ const schema = {
         "proxy_port?",
         "expires_at?",
         "ca_bundle_path?",
+        "relay_secret?",
         "sessions?",
       ],
     },

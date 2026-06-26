@@ -27,6 +27,7 @@ use crate::ipc::VerifiedClient;
 use crate::proxy::auth::{authenticate_proxy_headers, verify_grant};
 use crate::proxy::ca::{self, upstream_root_store};
 use crate::proxy::peer_tcp::peer_pid_from_stream;
+use crate::proxy::relay_auth;
 use crate::proxy::rewrite::{rewrite_body, rewrite_headers};
 use crate::proxy::transparent;
 use crate::state::AppState;
@@ -191,6 +192,14 @@ async fn handle_client(mut stream: TcpStream, ctx: Arc<BucketProxyContext>) -> i
     );
 
     let relay_pid = if peer_loopback && first[0] == relay_frame::first_byte() {
+        let peer_pid = match peer_pid_from_stream(&stream) {
+            Ok(pid) => pid,
+            Err(e) => {
+                capture_log::log("proxy", format!("relay peer pid resolve failed: {e}"));
+                return Ok(());
+            }
+        };
+
         let mut rest = [0u8; relay_frame::HEADER_LEN - 1];
         if stream.read_exact(&mut rest).await.is_err() {
             capture_log::log("proxy", "relay header truncated");
@@ -199,7 +208,14 @@ async fn handle_client(mut stream: TcpStream, ctx: Arc<BucketProxyContext>) -> i
         let mut hdr = [0u8; relay_frame::HEADER_LEN];
         hdr[0] = first[0];
         hdr[1..].copy_from_slice(&rest);
-        match relay_frame::decode(&hdr) {
+
+        let verified_pid = with_db(&ctx, |conn, _| {
+            Ok(relay_auth::verify_relay_header(conn, &ctx.bucket_id, peer_pid, &hdr))
+        })
+        .ok()
+        .flatten();
+
+        match verified_pid {
             Some(pid) => {
                 let mut tls_first = [0u8; 1];
                 if stream.read_exact(&mut tls_first).await.is_err() {
@@ -211,10 +227,14 @@ async fn handle_client(mut stream: TcpStream, ctx: Arc<BucketProxyContext>) -> i
                 Some(pid)
             }
             None => {
-                capture_log::log("proxy", "invalid relay header magic");
-                stream
-                    .write_all(b"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n")
-                    .await?;
+                capture_log::log(
+                    "proxy",
+                    format!(
+                        "relay authentication failed bucket={} tcp_peer_pid={peer_pid} \
+                         (see relay-auth / peer-trust lines above; set ARGUS_CAPTURE_LOG=1 in release)",
+                        ctx.bucket_id
+                    ),
+                );
                 return Ok(());
             }
         }
@@ -607,15 +627,16 @@ mod tests {
 
     #[test]
     fn relay_header_peel_before_tls() {
+        let secret = [5u8; 32];
         let pid = 35_096u32;
-        let hdr = relay_frame::encode(pid);
+        let hdr = relay_frame::encode_signed(&secret, pid, 1);
         assert_eq!(hdr[0], relay_frame::first_byte());
-        assert_eq!(relay_frame::decode(&hdr), Some(pid));
+        assert_eq!(relay_frame::decode_and_verify(&secret, &hdr), Some((pid, 1)));
         let mut combined = hdr.to_vec();
         combined.push(0x16);
         assert_eq!(
-            relay_frame::decode(&combined[..relay_frame::HEADER_LEN]),
-            Some(pid)
+            relay_frame::decode_and_verify(&secret, &combined[..relay_frame::HEADER_LEN]),
+            Some((pid, 1))
         );
         assert_eq!(combined[relay_frame::HEADER_LEN], 0x16);
     }

@@ -10,7 +10,7 @@ mod register;
 mod sessions;
 mod state;
 mod messages;
-mod util;
+pub mod util;
 
 use state::AppState;
 use tauri::Manager;

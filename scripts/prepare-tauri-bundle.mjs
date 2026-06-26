@@ -41,6 +41,12 @@ function binaryExists(srcRel) {
   return fs.existsSync(abs);
 }
 
+function sidecarDest(baseName) {
+  return platform === "windows"
+    ? `lib/argus/${baseName}.exe`
+    : `lib/argus/${baseName}`;
+}
+
 function addReleaseBinary(baseName, dest, { required = false } = {}) {
   const srcRel = releaseBinaryRel(baseName);
   if (binaryExists(srcRel)) {
@@ -56,20 +62,20 @@ function addReleaseBinary(baseName, dest, { required = false } = {}) {
   return false;
 }
 
-addReleaseBinary("argus-cli", "lib/argus/argus-cli", { required: true });
+addReleaseBinary("argus-cli", sidecarDest("argus-cli"), { required: true });
 
 if (!devMode) {
   if (platform === "linux") {
     addReleaseBinary(
       "argus-redirector-linux",
-      "lib/argus/argus-redirector-linux",
+      sidecarDest("argus-redirector-linux"),
     );
   }
 
   if (platform === "windows") {
     addReleaseBinary(
       "argus-redirector-windows",
-      "lib/argus/argus-redirector-windows",
+      sidecarDest("argus-redirector-windows"),
     );
     const windivertDir = path.join(root, "third_party", "windivert");
     for (const f of ["WinDivert.dll", "WinDivert64.sys"]) {

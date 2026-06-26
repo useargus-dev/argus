@@ -1,5 +1,6 @@
 mod handler;
 pub mod peer;
+mod pipe_security;
 mod protocol;
 mod server;
 

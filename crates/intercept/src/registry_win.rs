@@ -1,16 +1,27 @@
 #[cfg(windows)]
+use windows_sys::Win32::System::Registry::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+
+#[cfg(windows)]
 pub fn read_install_path_registry() -> anyhow::Result<std::path::PathBuf> {
+    read_install_path_from_hive(HKEY_LOCAL_MACHINE)
+        .or_else(|_| read_install_path_from_hive(HKEY_CURRENT_USER))
+}
+
+#[cfg(windows)]
+fn read_install_path_from_hive(
+    hive: windows_sys::Win32::System::Registry::HKEY,
+) -> anyhow::Result<std::path::PathBuf> {
     use std::os::windows::ffi::OsStringExt;
     use std::path::PathBuf;
     use windows_sys::Win32::System::Registry::{
-        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ,
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, KEY_READ, REG_SZ,
     };
 
     let subkey: Vec<u16> = "Software\\Argus\0".encode_utf16().collect();
     let value_name: Vec<u16> = "InstallPath\0".encode_utf16().collect();
     unsafe {
         let mut key: HKEY = std::ptr::null_mut();
-        if RegOpenKeyExW(HKEY_LOCAL_MACHINE, subkey.as_ptr(), 0, KEY_READ, &mut key) != 0 {
+        if RegOpenKeyExW(hive, subkey.as_ptr(), 0, KEY_READ, &mut key) != 0 {
             anyhow::bail!("registry key not found");
         }
         let mut kind = 0u32;

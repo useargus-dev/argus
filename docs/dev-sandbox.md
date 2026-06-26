@@ -76,6 +76,6 @@ On Linux, run from a normal shell — you may be prompted for **sudo** when capt
 
 ## Installed layout (release)
 
-After NSIS/deb install, CLI is on PATH as `argus` (copied from bundled `lib/argus/argus-cli`). Redirector lives in `$ARGUS_HOME/lib/argus/`.
+After NSIS/deb install, CLI is on PATH as `argus` (copied from bundled `lib/argus/argus-cli.exe`). Redirector lives at `$ARGUS_HOME/lib/argus/argus-redirector-windows.exe`.
 
 See also [run-mode.md](./run-mode.md) and [install-sidecars.md](./install-sidecars.md).

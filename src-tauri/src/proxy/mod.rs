@@ -1,5 +1,7 @@
 pub mod auth;
 pub mod ca;
+pub mod peer_relay;
+pub mod relay_auth;
 pub mod peer_tcp;
 pub mod rewrite;
 pub mod server;

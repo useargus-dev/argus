@@ -3,6 +3,7 @@
 mod cmd;
 mod config;
 mod paths;
+mod spawn;
 
 use clap::{Parser, Subcommand};
 

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use base64::Engine;
 use tauri::{AppHandle, Manager};
 
 use crate::error::AppError;
@@ -13,7 +14,8 @@ use crate::ipc::protocol::{
 use crate::messages;
 use crate::proxy::ProxyRuntime;
 use crate::sandbox::approval::{request_client_grant, GrantInsertDetails, GrantRequest};
-use crate::sandbox::cache::lookup_session_by_pid;
+use crate::sandbox::db::with_session_db;
+use crate::sandbox::gate;
 use crate::sandbox::service::{
     create_sandbox_session, list_active_sessions, register_session_pids, revoke_sandbox_session,
 };
@@ -81,8 +83,8 @@ pub async fn handle_request(
         ParsedIpcRequest::SandboxRegisterPids(req) => {
             process_sandbox_register_pids(&state, peer, req).await
         }
-        ParsedIpcRequest::SandboxRevoke(req) => process_sandbox_revoke(&state, req).await,
-        ParsedIpcRequest::SandboxList(req) => process_sandbox_list(&state, req).await,
+        ParsedIpcRequest::SandboxRevoke(req) => process_sandbox_revoke(&state, peer, req).await,
+        ParsedIpcRequest::SandboxList(req) => process_sandbox_list(&state, peer, req).await,
         ParsedIpcRequest::Unknown { request_id, msg_type } => Ok(IpcResponse::Error {
             request_id,
             code: "INVALID_REQUEST".into(),
@@ -127,9 +129,8 @@ async fn process_fetch_env(
     let (bucket_name, access_ttl, existing_env) = with_session_db(state, |conn, value_key| {
         let meta = buckets::verify_client_token(conn, &req.bucket_id, &req.client_token)?;
 
-        if let Some(session) = lookup_session_by_pid(conn, &req.bucket_id, peer.pid)? {
+        if gate::verify_registered_pid(conn, &req.bucket_id, peer.pid).is_ok() {
             let env = ipc_env::resolve_bucket_env(conn, &req.bucket_id, value_key)?;
-            let _ = session;
             return Ok((meta.name, meta.access_ttl_minutes, Some(env)));
         }
 
@@ -157,6 +158,7 @@ async fn process_fetch_env(
             expires_at: None,
             ca_bundle_path: None,
             sessions: None,
+            relay_secret: None,
         });
     }
 
@@ -197,6 +199,7 @@ async fn process_fetch_env(
         expires_at: None,
         ca_bundle_path: None,
         sessions: None,
+        relay_secret: None,
     })
 }
 
@@ -250,7 +253,7 @@ async fn process_sandbox_create(
     )
     .await?;
 
-    let (session, env, ca_bundle_path) = with_session_db(state, |conn, value_key| {
+    let (session, env, ca_bundle_path, relay_secret) = with_session_db(state, |conn, value_key| {
         let ttl = client_grants::access_ttl_minutes(conn, access_ttl)?;
         create_sandbox_session(
             conn,
@@ -260,11 +263,12 @@ async fn process_sandbox_create(
             &fingerprint,
             req.command_preview.as_deref(),
             ttl,
-            peer.pid,
             proxy_port,
             &req.client_token,
         )
     })?;
+
+    let relay_secret_b64 = base64::engine::general_purpose::STANDARD.encode(relay_secret);
 
     let _ = ProxyRuntime::ensure_bucket_running(app, &req.bucket_id, proxy_port);
     touch_activity(state);
@@ -278,6 +282,7 @@ async fn process_sandbox_create(
         ca_bundle_path: Some(ca_bundle_path),
         proxy: None,
         sessions: None,
+        relay_secret: Some(relay_secret_b64),
     })
 }
 
@@ -286,8 +291,9 @@ async fn process_sandbox_register_pids(
     peer: &VerifiedClient,
     req: SandboxRegisterPidsRequest,
 ) -> Result<IpcResponse, AppError> {
-    with_session_db(state, |conn, _| register_session_pids(conn, &req.session_id, &req.pids))?;
-    let _ = peer;
+    with_session_db(state, |conn, _| {
+        register_session_pids(conn, &peer.fingerprint, &req.session_id, &req.pids)
+    })?;
     Ok(IpcResponse::Ok {
         request_id: req.request_id,
         env: Default::default(),
@@ -297,14 +303,18 @@ async fn process_sandbox_register_pids(
         expires_at: None,
         ca_bundle_path: None,
         sessions: None,
+        relay_secret: None,
     })
 }
 
 async fn process_sandbox_revoke(
     state: &tauri::State<'_, AppState>,
+    peer: &VerifiedClient,
     req: SandboxRevokeRequest,
 ) -> Result<IpcResponse, AppError> {
-    with_session_db(state, |conn, _| revoke_sandbox_session(conn, &req.session_id))?;
+    with_session_db(state, |conn, _| {
+        revoke_sandbox_session(conn, &peer.fingerprint, &req.session_id)
+    })?;
     Ok(IpcResponse::Ok {
         request_id: req.request_id,
         env: Default::default(),
@@ -314,14 +324,18 @@ async fn process_sandbox_revoke(
         expires_at: None,
         ca_bundle_path: None,
         sessions: None,
+        relay_secret: None,
     })
 }
 
 async fn process_sandbox_list(
     state: &tauri::State<'_, AppState>,
+    peer: &VerifiedClient,
     req: SandboxListRequest,
 ) -> Result<IpcResponse, AppError> {
-    let sessions = with_session_db(state, |conn, _| list_active_sessions(conn))?;
+    let sessions = with_session_db(state, |conn, _| {
+        list_active_sessions(conn, &peer.fingerprint)
+    })?;
     let sessions = sessions
         .into_iter()
         .map(|s| SandboxSessionInfo {
@@ -341,6 +355,7 @@ async fn process_sandbox_list(
         expires_at: None,
         ca_bundle_path: None,
         sessions: Some(sessions),
+        relay_secret: None,
     })
 }
 
@@ -359,27 +374,6 @@ fn proxy_payload(
             ca_bundle_path: c.ca_bundle_path,
         }))
     })
-}
-
-fn with_session_db<T, F>(state: &tauri::State<'_, AppState>, f: F) -> Result<T, AppError>
-where
-    F: FnOnce(&rusqlite::Connection, &[u8; 32]) -> Result<T, AppError>,
-{
-    let inner = state
-        .0
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
-    let pool = inner
-        .db
-        .as_ref()
-        .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
-    let value_key = inner
-        .value_key()
-        .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
-    let conn = pool
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "db poisoned"))?;
-    f(&conn, &value_key)
 }
 
 fn touch_activity(state: &tauri::State<'_, AppState>) {

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 
 use anyhow::Result;
 use mitmproxy::messages::{ConnectionId, TransportCommand, TransportEvent, TunnelInfo};
@@ -10,6 +12,18 @@ use protocol::relay_frame;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, Mutex};
+
+static RELAY_NONCE: AtomicU64 = AtomicU64::new(1);
+static RELAY_SECRET: OnceLock<Option<[u8; 32]>> = OnceLock::new();
+
+/// Install per-session relay HMAC secret in-process (never via environment).
+pub fn init_relay_secret(secret: Option<[u8; 32]>) {
+    let _ = RELAY_SECRET.set(secret);
+}
+
+fn relay_secret() -> Option<[u8; 32]> {
+    RELAY_SECRET.get().and_then(|s| s.clone())
+}
 
 pub struct RelayTask {
     transport_events: mpsc::Receiver<TransportEvent>,
@@ -141,15 +155,26 @@ async fn relay_connection(
 
             if !relay_header_sent {
                 if let Some(pid) = captured_pid {
-                    let hdr = relay_frame::encode(pid);
-                    capture_log::log(
-                        "relay",
-                        format!(
-                            "conn {connection_id}: sending relay header pid={pid} ({} B TLS next)",
-                            data.len()
-                        ),
-                    );
-                    upstream_write.write_all(&hdr).await?;
+                    if let Some(secret) = relay_secret() {
+                        let nonce = RELAY_NONCE.fetch_add(1, Ordering::Relaxed);
+                        let hdr = relay_frame::encode_signed(&secret, pid, nonce);
+                        capture_log::log(
+                            "relay",
+                            format!(
+                                "conn {connection_id}: sending signed relay header pid={pid} ({} B TLS next)",
+                                data.len()
+                            ),
+                        );
+                        upstream_write.write_all(&hdr).await?;
+                    } else {
+                        capture_log::log(
+                            "relay",
+                            format!(
+                                "conn {connection_id}: relay secret missing; forwarding {} B without relay header",
+                                data.len()
+                            ),
+                        );
+                    }
                 } else {
                     capture_log::log(
                         "relay",

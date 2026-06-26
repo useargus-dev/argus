@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
+use base64::Engine;
 use ipc_client::{
     sandbox_create, sandbox_register_pids, sandbox_revoke, DEFAULT_TIMEOUT, IpcClientError,
 };
@@ -12,10 +12,10 @@ use intercept::{
 };
 use process_tree::spawn_watcher;
 use clap::Args;
-use tokio::process::Command;
 
 use crate::config::resolve_bucket;
 use crate::paths::{argus_home, redirector_path};
+use crate::spawn::build_run_command;
 use protocol::capture_log;
 
 #[derive(Args, Debug)]
@@ -85,9 +85,47 @@ pub async fn run(args: RunArgs) -> Result<()> {
             "ℹ Capture trace on (stderr). Set ARGUS_CAPTURE_LOG=0 to silence. \
              Proxy/redirector logs: Argus desktop terminal + redirector console (debug build)."
         );
+    } else {
+        eprintln!(
+            "ℹ For capture diagnostics in release builds: $env:ARGUS_CAPTURE_LOG='1' \
+             (CLI stderr + desktop proxy; also see ~/.argus/capture-trace.log)"
+        );
     }
 
+    let home = argus_home();
     let redirector_path = redirector_path();
+    capture_log::log(
+        "run",
+        format!(
+            "ARGUS_HOME={} (exists={})",
+            home.display(),
+            home.is_dir()
+        ),
+    );
+    capture_log::log(
+        "run",
+        format!(
+            "redirector={} (exists={})",
+            redirector_path.display(),
+            redirector_path.is_file()
+        ),
+    );
+    #[cfg(windows)]
+    {
+        let windivert_dll = redirector_path.with_file_name("WinDivert.dll");
+        let windivert_sys = redirector_path.with_file_name("WinDivert64.sys");
+        capture_log::log(
+            "run",
+            format!(
+                "WinDivert.dll exists={} WinDivert64.sys exists={}",
+                windivert_dll.is_file(),
+                windivert_sys.is_file()
+            ),
+        );
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        capture_log::log("run", format!("cli exe={}", exe.display()));
+    }
     capture_log::log(
         "run",
         format!(
@@ -96,8 +134,10 @@ pub async fn run(args: RunArgs) -> Result<()> {
             redirector_path.display()
         ),
     );
+    let relay_secret = decode_relay_secret(&session.relay_secret);
+
     let redirector = Arc::new(
-        start_redirector(session.proxy_port, Some(&redirector_path))
+        start_redirector(session.proxy_port, Some(&redirector_path), relay_secret)
             .await
             .context("failed to start network redirector")?,
     );
@@ -118,11 +158,40 @@ pub async fn run(args: RunArgs) -> Result<()> {
         capture_log::log("run", format!("CA bundle: {}", session.ca_bundle_path));
     }
 
-    let mut cmd = build_command(&args.command, &child_env)?;
+    if capture_log::enabled() {
+        capture_log::log(
+            "run",
+            format!(
+                "spawn: {} (cwd {})",
+                args.command.join(" "),
+                std::env::current_dir()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|_| "?".into())
+            ),
+        );
+    }
+
+    let mut cmd = build_run_command(&args.command, &child_env)?;
     // Spawn, then register intercept + sandbox PID before the child runs network I/O.
-    let mut child = cmd.spawn().context("failed to spawn command")?;
+    let mut child = cmd
+        .spawn()
+        .with_context(|| format!("failed to spawn `{}`", args.command.first().unwrap_or(&"?".into())))?;
     let root_pid = child.id().unwrap_or(0);
-    capture_log::log("run", format!("spawned child pid={root_pid}"));
+        capture_log::log("run", format!("spawned child pid={root_pid}"));
+    capture_log::log(
+        "run",
+        format!(
+            "trace file: {}",
+            capture_log::trace_log_hint().unwrap_or_else(|| "(unavailable)".into())
+        ),
+    );
+
+    sandbox_register_pids(&session.session_id, &[root_pid], DEFAULT_TIMEOUT)
+        .map_err(map_ipc_error)?;
+    capture_log::log(
+        "run",
+        format!("registered sandbox pids for session {}", session.session_id),
+    );
 
     {
         let mut pids = tracked_pids.lock().unwrap();
@@ -138,24 +207,24 @@ pub async fn run(args: RunArgs) -> Result<()> {
         );
     }
 
-    sandbox_register_pids(&session.session_id, &[root_pid], DEFAULT_TIMEOUT)
-        .map_err(map_ipc_error)?;
-    capture_log::log(
-        "run",
-        format!("registered sandbox pids for session {}", session.session_id),
-    );
-
     let session_id = session.session_id.clone();
     let pids_for_watcher = tracked_pids.clone();
     let redirector_for_watcher = redirector.clone();
     let watcher = spawn_watcher(root_pid, move |fresh| {
-        let _ = sandbox_register_pids(&session_id, &fresh, DEFAULT_TIMEOUT);
+        if let Err(e) = sandbox_register_pids(&session_id, &fresh, DEFAULT_TIMEOUT) {
+            capture_log::log(
+                "run",
+                format!("watcher: sandbox_register_pids failed: {e}"),
+            );
+        }
         if let Ok(mut pids) = pids_for_watcher.lock() {
             for pid in &fresh {
                 pids.insert(*pid);
             }
             let spec = intercept_spec_for_pids(&pids.iter().copied().collect::<Vec<_>>());
-            let _ = redirector_for_watcher.set_intercept(&spec);
+            if let Err(e) = redirector_for_watcher.set_intercept(&spec) {
+                capture_log::log("run", format!("watcher: set_intercept failed: {e}"));
+            }
         }
     });
 
@@ -167,6 +236,21 @@ pub async fn run(args: RunArgs) -> Result<()> {
     }
     let _ = sandbox_revoke(&session.session_id, DEFAULT_TIMEOUT);
     std::process::exit(exit_code);
+}
+
+fn decode_relay_secret(raw: &str) -> Option<[u8; 32]> {
+    if raw.is_empty() {
+        return None;
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(raw.trim())
+        .ok()?;
+    if bytes.len() != 32 {
+        return None;
+    }
+    let mut secret = [0u8; 32];
+    secret.copy_from_slice(&bytes);
+    Some(secret)
 }
 
 fn print_dry_run(bucket_id: &str, args: &RunArgs) -> Result<()> {
@@ -195,21 +279,6 @@ fn apply_sandbox_env(env: &mut HashMap<String, String>, ca: &str, session: &str)
     }
 }
 
-fn build_command(argv: &[String], env: &HashMap<String, String>) -> Result<Command> {
-    let program = argv.first().context("empty command")?;
-    let mut cmd = Command::new(program);
-    cmd.args(&argv[1..]);
-    cmd.envs(env);
-    cmd.stdin(Stdio::inherit());
-    cmd.stdout(Stdio::inherit());
-    cmd.stderr(Stdio::inherit());
-    #[cfg(unix)]
-    {
-        cmd.process_group(0);
-    }
-    Ok(cmd)
-}
-
 async fn run_child(
     env: &HashMap<String, String>,
     ca: &str,
@@ -218,8 +287,13 @@ async fn run_child(
 ) -> Result<i32> {
     let mut child_env = env.clone();
     apply_sandbox_env(&mut child_env, ca, session_id);
-    let mut cmd = build_command(command, &child_env)?;
-    let mut child = cmd.spawn()?;
+    let mut cmd = build_run_command(command, &child_env)?;
+    let mut child = cmd.spawn().with_context(|| {
+        format!(
+            "failed to spawn `{}`",
+            command.first().unwrap_or(&"?".into())
+        )
+    })?;
     wait_with_signals(&mut child).await
 }
 

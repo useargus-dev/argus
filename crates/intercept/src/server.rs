@@ -30,11 +30,12 @@ impl RedirectorHandle {
     }
 }
 
-async fn start_redirector<T>(conf: T, target_port: u16) -> Result<RedirectorHandle>
+async fn start_redirector<T>(conf: T, target_port: u16, relay_secret: Option<[u8; 32]>) -> Result<RedirectorHandle>
 where
     T: PacketSourceConf<Data = UnboundedSender<InterceptConf>>,
     T::Task: PacketSourceTask,
 {
+    crate::relay::init_relay_secret(relay_secret);
     let target = SocketAddr::from((Ipv4Addr::LOCALHOST, target_port));
 
     let (transport_events_tx, transport_events_rx) = mpsc::channel(256);
@@ -79,6 +80,7 @@ where
 pub async fn start_linux_redirector(
     executable_path: PathBuf,
     target_port: u16,
+    relay_secret: Option<[u8; 32]>,
 ) -> Result<RedirectorHandle> {
     use mitmproxy::packet_sources::linux::LinuxConf;
     if !executable_path.exists() {
@@ -87,13 +89,14 @@ pub async fn start_linux_redirector(
             executable_path.display()
         );
     }
-    start_redirector(LinuxConf { executable_path }, target_port).await
+    start_redirector(LinuxConf { executable_path }, target_port, relay_secret).await
 }
 
 #[cfg(not(target_os = "linux"))]
 pub async fn start_linux_redirector(
     _executable_path: PathBuf,
     _target_port: u16,
+    _relay_secret: Option<[u8; 32]>,
 ) -> Result<RedirectorHandle> {
     anyhow::bail!("Linux redirector is only available on Linux")
 }
@@ -102,6 +105,7 @@ pub async fn start_linux_redirector(
 pub async fn start_windows_redirector(
     executable_path: PathBuf,
     target_port: u16,
+    relay_secret: Option<[u8; 32]>,
 ) -> Result<RedirectorHandle> {
     use mitmproxy::packet_sources::windows::WindowsConf;
     if !executable_path.exists() {
@@ -110,13 +114,14 @@ pub async fn start_windows_redirector(
             executable_path.display()
         );
     }
-    start_redirector(WindowsConf { executable_path }, target_port).await
+    start_redirector(WindowsConf { executable_path }, target_port, relay_secret).await
 }
 
 #[cfg(not(windows))]
 pub async fn start_windows_redirector(
     _executable_path: PathBuf,
     _target_port: u16,
+    _relay_secret: Option<[u8; 32]>,
 ) -> Result<RedirectorHandle> {
     anyhow::bail!("Windows redirector is only available on Windows")
 }

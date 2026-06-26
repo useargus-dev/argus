@@ -1,4 +1,4 @@
-//! Re-export shared IPC protocol types from `protocol`.
+//! Re-export shared IPC protocol types from `protocol` (source of truth: `crates/protocol`).
 
 pub use protocol::*;
 

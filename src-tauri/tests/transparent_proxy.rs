@@ -1,69 +1,14 @@
 //! Integration-style tests for transparent sandbox gate and protocol sniff routing.
 
-use argus_lib::proxy::server::{route_incoming_first_byte, IncomingRoute};
-use argus_lib::proxy::transparent::{evaluate_transparent_gate, TransparentGateResult};
+mod common;
+
 use argus_lib::db::meta::run_migrations;
 use argus_lib::db::sandbox_sessions;
-use chrono::Utc;
-use rusqlite::{params, Connection};
-use uuid::Uuid;
-
-fn mem_conn() -> Connection {
-    let conn = Connection::open_in_memory().unwrap();
-    run_migrations(&conn).unwrap();
-    conn
-}
-
-fn seed_bucket(conn: &Connection) -> String {
-    let id = Uuid::new_v4().to_string();
-    let map_id = Uuid::new_v4().to_string();
-    let now = Utc::now().to_rfc3339();
-    conn.execute(
-        "INSERT INTO app_buckets (id, name, client_token_hash, client_token_enc,
-         access_ttl_minutes, is_tray_active, proxy_enabled, proxy_port, allowed_hosts,
-         created_at, updated_at)
-         VALUES (?1, 'test', x'00', x'00', 60, 1, 1, 9001, '[\"api.example.com\"]', ?2, ?2)",
-        params![id, now],
-    )
-    .unwrap();
-    conn.execute(
-        "INSERT INTO bucket_mappings (id, bucket_id, env_label, mapping_type, text_value,
-         proxy_enabled, allowed_hosts, created_at)
-         VALUES (?1, ?2, 'API', 'text', '', 1, '[\"api.example.com\"]', ?3)",
-        params![map_id, id, now],
-    )
-    .unwrap();
-    id
-}
-
-fn tls_client_hello(host: &str) -> Vec<u8> {
-    let mut hello = vec![0x03, 0x03];
-    hello.extend_from_slice(&[0u8; 32]);
-    hello.push(0);
-    hello.extend_from_slice(&[0, 2, 0x00, 0x2f]);
-    hello.push(1);
-    hello.push(0);
-    let host_bytes = host.as_bytes();
-    let sni_list_len = 3 + host_bytes.len();
-    let ext_len = 2 + sni_list_len;
-    let mut exts = vec![0x00, 0x00];
-    exts.extend_from_slice(&(ext_len as u16).to_be_bytes());
-    exts.extend_from_slice(&(sni_list_len as u16).to_be_bytes());
-    exts.push(0);
-    exts.extend_from_slice(&(host_bytes.len() as u16).to_be_bytes());
-    exts.extend_from_slice(host_bytes);
-    hello.extend_from_slice(&(exts.len() as u16).to_be_bytes());
-    hello.extend_from_slice(&exts);
-    let hello_len = hello.len();
-    let mut body = vec![0x01];
-    body.extend_from_slice(&(hello_len as u32).to_be_bytes()[1..]);
-    body.extend_from_slice(&hello);
-    let record_len = body.len();
-    let mut record = vec![0x16, 0x03, 0x01];
-    record.extend_from_slice(&(record_len as u16).to_be_bytes());
-    record.extend_from_slice(&body);
-    record
-}
+use argus_lib::proxy::server::{route_incoming_first_byte, IncomingRoute};
+use argus_lib::proxy::transparent::{evaluate_transparent_gate, TransparentGateResult};
+use argus_lib::util::process_identity::process_boot_id;
+use protocol::test_fixtures::minimal_client_hello_with_sni;
+use rusqlite::Connection;
 
 #[test]
 fn connect_proxy_first_byte_unchanged() {
@@ -74,7 +19,9 @@ fn connect_proxy_first_byte_unchanged() {
 #[test]
 fn mock_tls_client_session_gate_allows_rewrite_path() {
     let conn = mem_conn();
-    let bucket_id = seed_bucket(&conn);
+    let bucket_id = common::seed_bucket(&conn, r#"["api.example.com"]"#);
+    common::seed_grant(&conn, &bucket_id, "grant-1");
+    let pid = std::process::id();
     let session = sandbox_sessions::create_session(
         &conn,
         &bucket_id,
@@ -84,24 +31,27 @@ fn mock_tls_client_session_gate_allows_rewrite_path() {
         60,
     )
     .unwrap();
-    sandbox_sessions::register_pids(&conn, &session.id, &[12345]).unwrap();
+    let boot_id = process_boot_id(pid).expect("live pid");
+    sandbox_sessions::register_pids(&conn, &session.id, &[(pid, boot_id)]).unwrap();
     let vk = [0u8; 32];
-    let prefix = tls_client_hello("api.example.com");
-    match evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(12345), &prefix) {
+    let prefix = minimal_client_hello_with_sni("api.example.com");
+    match evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix) {
         TransparentGateResult::Ok(ok) => {
             assert_eq!(ok.session_id, session.id);
             assert_eq!(ok.host, "api.example.com");
         }
-        TransparentGateResult::Deny { .. } => panic!("expected session gate to allow"),
+        TransparentGateResult::Deny { reason, .. } => {
+            panic!("expected session gate to allow, got {reason}")
+        }
     }
 }
 
 #[test]
 fn unregistered_pid_denied() {
     let conn = mem_conn();
-    let bucket_id = seed_bucket(&conn);
+    let bucket_id = common::seed_bucket(&conn, r#"["api.example.com"]"#);
     let vk = [0u8; 32];
-    let prefix = tls_client_hello("api.example.com");
+    let prefix = minimal_client_hello_with_sni("api.example.com");
     assert!(matches!(
         evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(99999), &prefix),
         TransparentGateResult::Deny { .. }
@@ -111,7 +61,9 @@ fn unregistered_pid_denied() {
 #[test]
 fn revoked_session_denied() {
     let conn = mem_conn();
-    let bucket_id = seed_bucket(&conn);
+    let bucket_id = common::seed_bucket(&conn, r#"["api.example.com"]"#);
+    common::seed_grant(&conn, &bucket_id, "grant-1");
+    let pid = std::process::id();
     let session = sandbox_sessions::create_session(
         &conn,
         &bucket_id,
@@ -121,12 +73,19 @@ fn revoked_session_denied() {
         60,
     )
     .unwrap();
-    sandbox_sessions::register_pids(&conn, &session.id, &[12345]).unwrap();
+    let boot_id = process_boot_id(pid).expect("live pid");
+    sandbox_sessions::register_pids(&conn, &session.id, &[(pid, boot_id)]).unwrap();
     sandbox_sessions::revoke_session(&conn, &session.id).unwrap();
     let vk = [0u8; 32];
-    let prefix = tls_client_hello("api.example.com");
+    let prefix = minimal_client_hello_with_sni("api.example.com");
     assert!(matches!(
-        evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(12345), &prefix),
+        evaluate_transparent_gate(&conn, &vk, &bucket_id, Some(pid), &prefix),
         TransparentGateResult::Deny { .. }
     ));
+}
+
+fn mem_conn() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    run_migrations(&conn).unwrap();
+    conn
 }

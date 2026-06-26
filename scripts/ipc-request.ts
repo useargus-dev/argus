@@ -7,10 +7,11 @@
  *   cd E:/Projects/argus-project/argus
  *   pnpm ipc:test -- --bucket-id ID --token TOKEN
  *
- * Windows: \\.\pipe\argus — macOS/Linux: ~/.argus/argus.sock
+ * Windows: \\.\pipe\argus-{sessionId} — macOS/Linux: ~/.argus/argus.sock
  */
 
 import { randomUUID } from "node:crypto";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -30,6 +31,22 @@ interface IpcResponse {
   env?: Record<string, string>;
   code?: string;
   message?: string;
+}
+
+function windowsPipeName(): string {
+  try {
+    const out = execSync(
+      'powershell -NoProfile -NonInteractive -Command "(Get-Process -Id $PID).SessionId"',
+      { encoding: "utf8", windowsHide: true },
+    ).trim();
+    const sid = parseInt(out, 10);
+    if (!Number.isNaN(sid) && sid > 0) {
+      return `\\\\.\\pipe\\argus-${sid}`;
+    }
+  } catch {
+    // fall through to legacy name
+  }
+  return "\\\\.\\pipe\\argus";
 }
 
 function socketPath(): string {
@@ -88,7 +105,7 @@ async function sendUnix(sockPath: string, payload: IpcRequest): Promise<string> 
 
 async function sendWindows(payload: IpcRequest): Promise<string> {
   return new Promise((resolve, reject) => {
-    const socket = net.connect("\\\\.\\pipe\\argus");
+    const socket = net.connect(windowsPipeName());
     const line = `${JSON.stringify(payload)}\n`;
 
     socket.once("connect", () => {
@@ -151,7 +168,7 @@ async function main(): Promise<number> {
     console.error(`connection failed: ${msg}`);
     console.error(
       process.platform === "win32"
-        ? "Is Argus signed in? Named pipe \\\\.\\pipe\\argus must exist."
+        ? `Is Argus signed in? Named pipe ${windowsPipeName()} must exist.`
         : "Is Argus signed in?",
     );
     return 1;

@@ -52,7 +52,11 @@ The CLI registers the root PID and watches the process tree. New worker PIDs are
 
 ## Single approval
 
-`sandbox_create` prompts once for `argus run`. Child processes inherit the session: `fetch_env` from SDK `load_env()` / `loadEnv()` skips a second prompt when the caller PID is registered on an active sandbox session (or when `ARGUS_SANDBOX=1` is set client-side).
+`sandbox_create` prompts once for `argus run`. Child processes inherit the session: `fetch_env` from SDK `load_env()` / `loadEnv()` skips a second prompt when the caller PID is registered on an active sandbox session with an **active grant** (or when `ARGUS_SANDBOX=1` is set client-side — UX-only; server PID + grant checks are authoritative).
+
+## Relay authentication (Tier 2)
+
+The CLI receives a per-session `relay_secret` from `sandbox_create` and sets `ARGUS_RELAY_SECRET` for the intercept relay only (never injected into the sandbox child). Each relay TCP connection to the bucket proxy carries an HMAC-signed 20-byte header binding the captured PID. The proxy verifies redirector peer attestation + HMAC before MITM.
 
 ## Linux PID path
 

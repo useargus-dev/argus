@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use rusqlite::Connection;
 use tauri::{AppHandle, Emitter};
 use tokio::time::timeout;
 
@@ -12,6 +11,7 @@ use crate::error::AppError;
 use crate::infra::db::client_grants;
 use crate::ipc::peer::VerifiedClient;
 use crate::messages;
+use crate::sandbox::db::with_session_db;
 use crate::sessions::{ClientAccessRequestEvent, PendingApprovalStore, PendingDecision};
 use crate::state::AppState;
 
@@ -124,27 +124,6 @@ pub async fn request_client_grant(
             })
         }
     }
-}
-
-fn with_session_db<T, F>(state: &tauri::State<'_, AppState>, f: F) -> Result<T, AppError>
-where
-    F: FnOnce(&Connection, &[u8; 32]) -> Result<T, AppError>,
-{
-    let inner = state
-        .0
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "state poisoned"))?;
-    let pool = inner
-        .db
-        .as_ref()
-        .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
-    let value_key = inner
-        .value_key()
-        .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
-    let conn = pool
-        .lock()
-        .map_err(|_| AppError::message("LOCK_ERROR", "db poisoned"))?;
-    f(&conn, &value_key)
 }
 
 #[cfg(test)]

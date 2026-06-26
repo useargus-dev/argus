@@ -1,11 +1,15 @@
 //! Shared IPC types for Argus desktop and CLI sidecar.
 
+pub mod ipc_endpoint;
 pub mod relay_frame;
 pub mod capture_log;
+pub mod test_fixtures;
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+
+pub use ipc_endpoint::ipc_pipe_name;
 
 /// v3 env fetch (no `type` field).
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -92,6 +96,8 @@ pub enum IpcResponse {
         ca_bundle_path: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sessions: Option<Vec<SandboxSessionInfo>>,
+        #[serde(default, skip_serializing_if = "Option::is_none", alias = "relaySecret")]
+        relay_secret: Option<String>,
     },
     Denied {
         request_id: String,
@@ -194,6 +200,7 @@ mod tests {
             expires_at: Some("2026-01-01T00:00:00Z".into()),
             ca_bundle_path: Some("/tmp/ca.pem".into()),
             sessions: None,
+            relay_secret: None,
         };
         let line = resp.to_line();
         assert!(line.contains("session_id"));
