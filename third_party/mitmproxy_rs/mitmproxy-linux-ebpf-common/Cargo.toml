@@ -1,0 +1,18 @@
+[package]
+name = "mitmproxy-linux-ebpf-common"
+license = "MIT"
+authors = [
+    "Fabio Valentini <decathorpe@gmail.com>",
+    "Maximilian Hils <cargo@maximilianhils.com>",
+]
+version = "0.13.0-dev"
+repository = "https://github.com/mitmproxy/mitmproxy-rs"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[target.'cfg(target_os = "linux")'.dependencies]
+aya-ebpf = { version = "0.1.1", default-features = false }
+
+[lib]
+path = "src/lib.rs"
