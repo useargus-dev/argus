@@ -26,6 +26,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf clang llvm libbpf-dev
 
+      - name: Install bpf-linker
+        run: cargo install --locked bpf-linker@0.9.15
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -52,7 +55,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
       - name: Install BPF build deps
-        run: sudo apt-get update && sudo apt-get install -y clang llvm libbpf-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev
+          cargo install --locked bpf-linker@0.9.15
       - name: Build Linux sidecars
         run: |
           cargo build --release -p argus-cli -p argus-redirector-linux

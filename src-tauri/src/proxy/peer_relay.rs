@@ -204,26 +204,41 @@ fn redirector_dir(home: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ARGUS_HOME_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_argus_home<F: FnOnce()>(home: &Path, f: F) {
+        let _guard = ARGUS_HOME_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::env::set_var("ARGUS_HOME", home.as_os_str());
+        f();
+        std::env::remove_var("ARGUS_HOME");
+    }
 
     #[test]
     fn accepts_install_paths() {
         let home = std::env::temp_dir().join("argus-trust-test");
-        let cli = home.join("argus-cli.exe");
-        let redirector = home.join("lib").join("argus").join("argus-redirector-windows.exe");
-        std::env::set_var("ARGUS_HOME", home.as_os_str());
-        assert!(is_trusted_relay_exe_path(cli.to_string_lossy().as_ref()));
-        assert!(is_trusted_relay_exe_path(redirector.to_string_lossy().as_ref()));
-        std::env::remove_var("ARGUS_HOME");
+        let cli = home.join("lib").join("argus").join("argus-cli.exe");
+        let redirector = home
+            .join("lib")
+            .join("argus")
+            .join("argus-redirector-windows.exe");
+        with_argus_home(&home, || {
+            assert!(is_trusted_relay_exe_path(cli.to_string_lossy().as_ref()));
+            assert!(is_trusted_relay_exe_path(
+                redirector.to_string_lossy().as_ref()
+            ));
+        });
     }
 
     #[test]
     fn accepts_program_files_argus_casing() {
         let home = PathBuf::from(r"C:\Program Files\argus");
         let cli = home.join("bin").join("argus.exe");
-        std::env::set_var("ARGUS_HOME", home.as_os_str());
-        let (ok, detail) = evaluate_relay_exe_trust(&cli.to_string_lossy());
-        assert!(ok, "{detail}");
-        std::env::remove_var("ARGUS_HOME");
+        with_argus_home(&home, || {
+            let (ok, detail) = evaluate_relay_exe_trust(&cli.to_string_lossy());
+            assert!(ok, "{detail}");
+        });
     }
 
     #[test]

@@ -117,6 +117,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get install -y clang llvm libbpf-dev
+          cargo install --locked bpf-linker@0.9.15
           cargo build --release -p argus-cli -p argus-redirector-linux
           node scripts/prepare-tauri-bundle.mjs linux
 
