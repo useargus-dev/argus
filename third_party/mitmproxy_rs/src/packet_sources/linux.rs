@@ -97,7 +97,8 @@ async fn spawn_redirector(
         if !std::io::stdin().is_terminal() {
             cmd.arg("--non-interactive");
         }
-        cmd.arg(executable).arg(listener_addr)
+        cmd.arg(executable).arg(listener_addr);
+        cmd
     } else {
         let mut cmd = Command::new(executable);
         cmd.arg(listener_addr);
