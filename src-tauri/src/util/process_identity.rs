@@ -28,7 +28,8 @@ fn read_boot_id(pid: u32) -> Option<String> {
     // Field 22 (1-indexed) after comm in parens is starttime.
     let after_comm = stat.rsplit(')').next()?.trim();
     let fields: Vec<&str> = after_comm.split_whitespace().collect();
-    fields.get(20).map(|s| s.to_string())
+    // Field 22 (1-indexed) in proc(5) is starttime; first token after comm is field 3.
+    fields.get(19).map(|s| s.to_string())
 }
 
 #[cfg(target_os = "linux")]
