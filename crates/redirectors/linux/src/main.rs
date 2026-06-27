@@ -32,7 +32,12 @@ struct ActionWrapper(Action);
 
 unsafe impl aya::Pod for ActionWrapper {}
 
-unsafe impl aya::Pod for FlowKey {}
+// Pod cannot be implemented for external `FlowKey`; use a local newtype (aya-rs/aya#59).
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+struct FlowKeyPod(FlowKey);
+
+unsafe impl aya::Pod for FlowKeyPod {}
 
 const BPF_PROG: &[u8] = aya::include_bytes_aligned!(concat!(env!("OUT_DIR"), "/mitmproxy-linux"));
 const BPF_HASH: [u8; 20] = const_sha1::sha1(BPF_PROG).as_bytes();
@@ -101,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
         let map = ebpf
             .map_mut("FLOW_PID")
             .context("couldn't get FLOW_PID map")?;
-        BpfHashMap::<_, FlowKey, u32>::try_from(map).context("Cannot cast FLOW_PID to HashMap")?
+        BpfHashMap::<_, FlowKeyPod, u32>::try_from(map).context("Cannot cast FLOW_PID to HashMap")?
     };
 
     let mut intercept_conf = {
@@ -196,10 +201,10 @@ async fn main() -> anyhow::Result<()> {
 
 fn lookup_tunnel_info(
     data: &Bytes,
-    flow_pid: &mut BpfHashMap<aya::maps::MapData, FlowKey, u32>,
+    flow_pid: &mut BpfHashMap<aya::maps::MapData, FlowKeyPod, u32>,
 ) -> Option<TunnelInfo> {
     let key = flow_key_from_ipv4_packet(data)?;
-    let pid = flow_pid.get(&key, 0).ok().flatten()?;
+    let pid = flow_pid.get(&FlowKeyPod(key), 0).ok().flatten()?;
     Some(TunnelInfo {
         pid: Some(pid),
         process_name: None,

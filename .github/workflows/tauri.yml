@@ -21,6 +21,7 @@ jobs:
     env:
       CARGO_NET_RETRY: 10
       CARGO_HTTP_MULTIPLEXING: false
+      ARGUS_EBPF_TOOLCHAIN: nightly-2026-04-01
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +67,7 @@ jobs:
     env:
       CARGO_NET_RETRY: 10
       CARGO_HTTP_MULTIPLEXING: false
+      ARGUS_EBPF_TOOLCHAIN: nightly-2026-04-01
     steps:
       - uses: actions/checkout@v4
 

@@ -22,3 +22,10 @@ which = "8.0.2"
 [[bin]]
 name = "mitmproxy-linux"
 path = "src/main.rs"
+
+# build-std must compile core (and panic_abort) with abort strategy for no_std eBPF.
+[profile.dev.build-override]
+panic = "abort"
+
+[profile.release.build-override]
+panic = "abort"

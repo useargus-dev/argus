@@ -9,4 +9,10 @@
 target = ["bpfeb-unknown-none", "bpfel-unknown-none"]
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "panic_abort"]
+
+[target.bpfel-unknown-none]
+rustflags = ["-C", "panic=abort"]
+
+[target.bpfeb-unknown-none]
+rustflags = ["-C", "panic=abort"]
