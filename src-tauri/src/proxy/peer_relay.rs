@@ -38,16 +38,18 @@ pub fn is_trusted_relay_exe_path(exe_path: &str) -> bool {
 
 fn evaluate_relay_exe_trust(exe_path: &str) -> (bool, String) {
     let path = Path::new(exe_path);
-    let file_name = path.file_name().and_then(|n| n.to_str());
-    let is_cli = matches!(
-        file_name,
-        Some("argus-cli") | Some("argus-cli.exe") | Some("argus.exe")
-    );
-    let is_redirector = matches!(
-        file_name,
-        Some("argus-redirector-linux") | Some("argus-redirector-windows.exe")
-    );
-    if !is_cli && !is_redirector {
+    let file_name = relay_exe_basename(exe_path);
+
+    if is_dev_build_path(path) {
+        if is_known_relay_exe_name(file_name) {
+            return (
+                true,
+                format!(
+                    "relay exe trusted (dev build): {}",
+                    path.display()
+                ),
+            );
+        }
         return (
             false,
             format!(
@@ -57,15 +59,20 @@ fn evaluate_relay_exe_trust(exe_path: &str) -> (bool, String) {
         );
     }
 
-    if is_dev_build_path(path) {
+    if !is_known_relay_exe_name(file_name) {
         return (
-            true,
+            false,
             format!(
-                "relay exe trusted (dev build): {}",
+                "relay exe not a known sidecar: {} (basename={file_name:?})",
                 path.display()
             ),
         );
     }
+
+    let is_redirector = matches!(
+        file_name,
+        Some("argus-redirector-linux") | Some("argus-redirector-windows.exe")
+    );
 
     let home = argus_home();
     let base = if is_redirector {
@@ -95,10 +102,27 @@ fn evaluate_relay_exe_trust(exe_path: &str) -> (bool, String) {
     )
 }
 
+fn relay_exe_basename(exe_path: &str) -> Option<&str> {
+    exe_path
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|s| !s.is_empty())
+}
+
+fn is_known_relay_exe_name(file_name: Option<&str>) -> bool {
+    matches!(
+        file_name,
+        Some("argus-cli")
+            | Some("argus-cli.exe")
+            | Some("argus.exe")
+            | Some("argus-redirector-linux")
+            | Some("argus-redirector-windows.exe")
+    )
+}
+
 fn is_dev_build_path(path: &Path) -> bool {
-    let s = path.to_string_lossy();
-    s.contains("target/debug") || s.contains("target\\debug") || s.contains("target/release")
-        || s.contains("target\\release")
+    let s = path.to_string_lossy().replace('\\', "/");
+    s.contains("target/debug") || s.contains("target/release")
 }
 
 fn is_path_under(base: &Path, candidate: &Path) -> bool {
