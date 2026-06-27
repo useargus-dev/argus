@@ -1,4 +1,4 @@
-import tokenSvg from "@argus/public/token.svg?raw";
+import tokenSvg from "@/assets/token.svg?raw";
 
 import { cn } from "@/core/cn";
 

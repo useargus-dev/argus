@@ -1,10 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "argus",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "identifier": "com.useargus.dev",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "node scripts/prepare-tauri-bundle.mjs --dev && pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
@@ -33,6 +33,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {},
+    "windows": {
+      "nsis": {
+        "installMode": "both",
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    },
     "createUpdaterArtifacts": true
   },
   "plugins": {

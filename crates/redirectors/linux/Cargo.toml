@@ -1,0 +1,33 @@
+[package]
+name = "argus-redirector-linux"
+version.workspace = true
+description = "Argus Linux sandbox redirector (eBPF via mitmproxy)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "argus-redirector-linux"
+path = "src/main.rs"
+
+[dependencies]
+mitmproxy = { workspace = true }
+mitmproxy-linux-ebpf-common = { path = "../../../third_party/mitmproxy_rs/mitmproxy-linux-ebpf-common" }
+tun = { version = "0.8.5", features = ["async"] }
+aya = { version = "0.13.0", default-features = false }
+aya-log = { version = "0.2.1", default-features = false }
+tokio = { version = "1.48", features = ["macros", "net", "rt-multi-thread", "sync", "io-util", "signal"] }
+anyhow = { version = "1.0.100", features = ["backtrace"] }
+log = "0.4.29"
+env_logger = "0.11.5"
+prost = "0.14.1"
+internet-packet = { version = "0.2.0", features = ["checksums"] }
+libc = "0.2.176"
+const-sha1 = "0.3.0"
+
+[features]
+root-tests = []
+
+[build-dependencies]
+anyhow = { version = "1.0.100", features = ["backtrace"] }

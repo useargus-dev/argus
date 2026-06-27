@@ -43,10 +43,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Verify Cargo.lock is present
-        working-directory: src-tauri
         run: |
           if [ ! -f Cargo.lock ]; then
-            echo "::error::src-tauri/Cargo.lock is missing from the repo. Commit it (required for cargo audit)."
+            echo "::error::Cargo.lock is missing from the repo. Commit it (required for cargo audit)."
             exit 1
           fi
 
@@ -60,5 +59,4 @@ jobs:
         uses: taiki-e/install-action@cargo-audit
 
       - name: cargo audit
-        working-directory: src-tauri
         run: cargo audit

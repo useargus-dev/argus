@@ -4,12 +4,13 @@ mod infra;
 pub use infra::db as db;
 mod error;
 mod ipc;
-mod proxy;
+pub mod proxy;
+mod sandbox;
 mod register;
 mod sessions;
 mod state;
 mod messages;
-mod util;
+pub mod util;
 
 use state::AppState;
 use tauri::Manager;

@@ -1,8 +1,12 @@
 pub mod auth;
 pub mod ca;
+pub mod peer_relay;
+pub mod relay_auth;
 pub mod peer_tcp;
 pub mod rewrite;
 pub mod server;
+pub mod tls_sni;
+pub mod transparent;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -13,7 +17,7 @@ use crate::infra::db::buckets;
 use crate::proxy::ca::ensure_ca_material;
 use crate::proxy::server::{start_bucket_proxy, ProxyServerHandle};
 use crate::state::AppState;
-use crate::util::session;
+use crate::util::session as app_session;
 
 pub struct ProxyRuntime {
     servers: Mutex<HashMap<String, ProxyServerHandle>>,
@@ -56,10 +60,28 @@ impl ProxyRuntime {
         }
     }
 
+    /// Start the bucket proxy listener if not already running.
+    pub fn ensure_bucket_running(
+        app: &AppHandle,
+        bucket_id: &str,
+        port: u16,
+    ) -> Result<(), String> {
+        let proxy = app.state::<ProxyRuntime>();
+        let already = proxy
+            .servers
+            .lock()
+            .map_err(|_| "proxy lock poisoned".to_string())?
+            .contains_key(bucket_id);
+        if already {
+            return Ok(());
+        }
+        proxy.start_bucket(app, bucket_id, port)
+    }
+
     pub fn sync_enabled_buckets(app: &AppHandle) -> Result<(), String> {
         let _ = ensure_ca_material().map_err(|e| e.to_string())?;
         let state = app.state::<AppState>();
-        let list: Vec<(String, u16)> = session::with_db(&state, |conn, _inner| {
+        let list: Vec<(String, u16)> = app_session::with_db(&state, |conn, _inner| {
             buckets::list_proxy_enabled_buckets(conn)
         })
         .map_err(|e| e.to_string())?;

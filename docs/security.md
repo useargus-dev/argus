@@ -312,6 +312,17 @@ Desktop UI shows `ARGUS_BUCKET_ID` and `ARGUS_BUCKET_TOKEN` in project `.env`. I
 
 `locked` response if tray core stopped (user signed out). Libraries may fall back to `.env` per global setting. Note: **app lock** does not block IPC — requests are processed and the user can accept/deny grants or manage approvals while the vault UI is locked. Only sign-out stops the IPC server.
 
+### 8.5 Sandbox session IPC (`argus run`)
+
+| Control | Behavior |
+| ------- | -------- |
+| Session ownership | `sandbox_register_pids`, `sandbox_revoke`, and scoped `sandbox_list` require `peer.fingerprint == session.parent_fingerprint` |
+| Grant binding | PID registration and transparent gate require an active `client_grants` row for the session's `grant_id` |
+| Relay Tier 2 | Per-session `relay_secret` (in-memory only) + HMAC-signed relay header; proxy verifies redirector peer exe + tag before MITM |
+| PID reuse | `process_boot_id` captured at register; transparent gate compares live boot ID and deletes stale PID rows on mismatch |
+| Lifecycle | Grant revoke and bucket proxy disable / tray deactivate cascade session revoke + cache invalidation |
+| SDK `ARGUS_SANDBOX=1` | Client-side skip only; server PID + grant checks remain authoritative |
+
 ---
 
 ## 9. Client Grant Security

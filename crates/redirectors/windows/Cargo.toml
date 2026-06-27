@@ -1,0 +1,31 @@
+[package]
+name = "argus-redirector-windows"
+version.workspace = true
+description = "Argus Windows sandbox redirector (WinDivert via mitmproxy)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "argus-redirector-windows"
+path = "src/main.rs"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
+
+[package.metadata.winres]
+ProductName = "Argus Redirector"
+FileDescription = "Argus OS-level network capture redirector"
+
+[dependencies]
+protocol = { path = "../../protocol" }
+mitmproxy = { workspace = true }
+tokio = { version = "1.52", features = ["macros", "net", "rt-multi-thread", "sync", "io-util", "time"] }
+anyhow = { version = "1.0.102", features = ["backtrace"] }
+log = "0.4.31"
+env_logger = "0.11.10"
+prost = "0.14.3"
+internet-packet = { version = "0.2.3", features = ["checksums"] }
+lru_time_cache = "0.11.11"
+windivert = "0.6.0"

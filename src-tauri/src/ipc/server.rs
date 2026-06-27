@@ -9,6 +9,7 @@ use crate::infra::db;
 use crate::error::AppError;
 use crate::ipc::handler;
 use crate::ipc::peer;
+use crate::ipc::pipe_security;
 use crate::ipc::protocol::{IpcRequest, IpcResponse};
 use crate::sessions::PendingApprovalStore;
 
@@ -135,16 +136,15 @@ async fn serve_windows_pipe(
     pending_store: &Arc<PendingApprovalStore>,
     shutdown_rx: &mut watch::Receiver<bool>,
 ) -> Result<(), String> {
-    use tokio::net::windows::named_pipe::ServerOptions;
+    use protocol::ipc_pipe_name;
+
+    let pipe_name = ipc_pipe_name();
+    let mut server = pipe_security::create_ipc_pipe(&pipe_name, true).map_err(|e| e.to_string())?;
 
     loop {
         if *shutdown_rx.borrow() {
             break;
         }
-
-        let server = ServerOptions::new()
-            .create(r"\\.\pipe\argus")
-            .map_err(|e| e.to_string())?;
 
         tokio::select! {
             _ = shutdown_rx.changed() => {
@@ -152,10 +152,14 @@ async fn serve_windows_pipe(
             }
             ready = server.connect() => {
                 ready.map_err(|e| e.to_string())?;
+                let connected = server;
+                let next = pipe_security::create_ipc_pipe(&pipe_name, false)
+                    .map_err(|e| e.to_string())?;
+                server = next;
                 let app = app.clone();
                 let store = pending_store.clone();
                 tokio::spawn(async move {
-                    handle_windows_pipe(app, store, server).await;
+                    handle_windows_pipe(app, store, connected).await;
                 });
             }
         }

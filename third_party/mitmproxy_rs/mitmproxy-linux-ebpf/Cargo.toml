@@ -1,0 +1,27 @@
+[package]
+name = "mitmproxy-linux-ebpf"
+license = "MIT"
+authors = [
+    "Fabio Valentini <decathorpe@gmail.com>",
+    "Maximilian Hils <cargo@maximilianhils.com>",
+]
+version = "0.13.0-dev"
+repository = "https://github.com/mitmproxy/mitmproxy-rs"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+# Built out-of-tree by argus-redirector-linux/build.rs; not a workspace member.
+[workspace]
+
+[dependencies]
+mitmproxy-linux-ebpf-common = { path = "../mitmproxy-linux-ebpf-common" }
+aya-ebpf = { version = "0.1.1", default-features = false }
+aya-log-ebpf = { version = "0.1.0", default-features = false }
+
+[build-dependencies]
+which = "8.0.2"
+
+[[bin]]
+name = "mitmproxy-linux"
+path = "src/main.rs"

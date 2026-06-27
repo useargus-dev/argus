@@ -5,6 +5,7 @@ use crate::infra::db::bucket_mappings::{self, BucketMapping};
 use crate::infra::db::buckets::{self, BucketMeta, BucketWithToken};
 use crate::error::{AppError, AppResult};
 use crate::proxy::ProxyRuntime;
+use crate::sandbox::lifecycle::revoke_and_purge_bucket_sessions;
 use crate::state::AppState;
 use crate::util::session;
 
@@ -49,6 +50,7 @@ fn sync_proxy_listener(app: &AppHandle, conn: &rusqlite::Connection, bucket_id: 
                 .map_err(|e| AppError::message("PROXY_ERROR", e))?;
         }
     } else {
+        revoke_and_purge_bucket_sessions(conn, bucket_id)?;
         proxy.stop_bucket(bucket_id);
     }
     Ok(())
@@ -121,7 +123,7 @@ pub fn set_bucket_active(
 ) -> Result<BucketWithToken, String> {
     session::touch_and_check_auto_lock(&app, &state, true).map_err(|e| String::from(e))?;
 
-    session::with_db(&state, |conn, inner| {
+    let token = session::with_db(&state, |conn, inner| {
         session::sync_scopes(&app, inner);
         require_buckets(inner)?;
         let vk = inner
@@ -129,7 +131,17 @@ pub fn set_bucket_active(
             .ok_or_else(|| AppError::message("NOT_SIGNED_IN", "not signed in"))?;
         buckets::set_bucket_active(conn, &vk, &id, active).map_err(|e| e.into())
     })
-    .map_err(|e| String::from(e))
+    .map_err(|e| String::from(e))?;
+
+    if !active {
+        session::with_db(&state, |conn, _inner| {
+            revoke_and_purge_bucket_sessions(conn, &id)?;
+            Ok::<(), AppError>(())
+        })
+        .map_err(|e| String::from(e))?;
+    }
+
+    Ok(token)
 }
 
 #[tauri::command]

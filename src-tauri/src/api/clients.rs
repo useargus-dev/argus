@@ -5,6 +5,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::infra::db::client_grants::{self, GrantRow};
 use crate::ipc::IpcRuntime;
+use crate::sandbox::lifecycle::revoke_sessions_for_grant;
 use crate::sessions::{ClientAccessRequestEvent, PendingApprovalStore, PendingDecision};
 use crate::state::AppState;
 use crate::util::session;
@@ -113,5 +114,6 @@ pub fn revoke_grant(
     session::require_app_unlocked(&inner).map_err(|e| String::from(e))?;
     let pool = inner.db.as_ref().ok_or("not signed in")?;
     let conn = pool.lock().map_err(|_| "db poisoned".to_string())?;
+    revoke_sessions_for_grant(&conn, &grant_id).map_err(|e| e.to_string())?;
     client_grants::revoke_grant(&conn, &grant_id).map_err(|e| e.to_string())
 }

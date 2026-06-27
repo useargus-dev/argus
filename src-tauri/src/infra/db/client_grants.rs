@@ -10,23 +10,16 @@ pub struct ActiveGrant {
     pub id: String,
 }
 
-/// When peer PID cannot be resolved (e.g. some Windows paths), accept any active grant for bucket+token.
-pub fn find_active_grant_by_token(
-    conn: &Connection,
-    bucket_id: &str,
-    token_hash: &str,
-) -> AppResult<Option<ActiveGrant>> {
-    let row: Result<String, _> = conn.query_row(
-        "SELECT id FROM client_grants
-         WHERE bucket_id = ?1 AND token_hash = ?2
-           AND datetime(expires_at) > datetime('now')
-         ORDER BY last_seen_at DESC LIMIT 1",
-        params![bucket_id, token_hash],
+pub fn grant_is_active(conn: &Connection, grant_id: &str) -> AppResult<bool> {
+    let row: Result<i64, _> = conn.query_row(
+        "SELECT 1 FROM client_grants
+         WHERE id = ?1 AND datetime(expires_at) > datetime('now')",
+        [grant_id],
         |r| r.get(0),
     );
     match row {
-        Ok(id) => Ok(Some(ActiveGrant { id })),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Ok(_) => Ok(true),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
         Err(e) => Err(AppError::message("DB_ERROR", e.to_string())),
     }
 }

@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair, SanType};
+use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::RootCertStore;
-use rustls_pemfile::{certs, private_key};
 use tokio_rustls::rustls::ServerConfig;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -105,12 +105,12 @@ pub fn issue_leaf_cert(host: &str) -> AppResult<(Vec<CertificateDer<'static>>, P
     let leaf_pem = leaf_cert.pem();
     let leaf_key_pem = leaf_key.serialize_pem();
 
-    let leaf_certs: Vec<CertificateDer<'static>> = certs(&mut leaf_pem.as_bytes())
-        .collect::<Result<Vec<_>, _>>()
+    let leaf_certs: Vec<CertificateDer<'static>> =
+        CertificateDer::pem_slice_iter(leaf_pem.as_bytes())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| AppError::message("PROXY_CA", e.to_string()))?;
+    let key = PrivateKeyDer::from_pem_slice(leaf_key_pem.as_bytes())
         .map_err(|e| AppError::message("PROXY_CA", e.to_string()))?;
-    let key = private_key(&mut leaf_key_pem.as_bytes())
-        .map_err(|e| AppError::message("PROXY_CA", e.to_string()))?
-        .ok_or_else(|| AppError::message("PROXY_CA", "missing leaf private key"))?;
 
     Ok((leaf_certs, key))
 }
@@ -128,9 +128,10 @@ pub fn upstream_root_store() -> RootCertStore {
     let mut roots = RootCertStore::empty();
     let _ = roots.extend(TLS_SERVER_ROOTS.to_vec());
     if let Ok(ca_pem) = fs::read(ca_cert_path()) {
-        let mut slice = ca_pem.as_slice();
-        for c in certs(&mut slice).flatten() {
-            let _ = roots.add(c);
+        for cert in CertificateDer::pem_slice_iter(&ca_pem) {
+            if let Ok(cert) = cert {
+                let _ = roots.add(cert);
+            }
         }
     }
     roots

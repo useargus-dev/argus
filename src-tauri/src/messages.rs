@@ -46,6 +46,12 @@ pub fn proxy_port_missing(bucket_name: &str) -> String {
     )
 }
 
+pub fn proxy_disabled(bucket_name: &str) -> String {
+    format!(
+        "Enable Argus Proxy on bucket '{bucket_name}' in the Argus app before using argus run."
+    )
+}
+
 pub fn peer_resolve(detail: impl Into<String>) -> String {
     format!(
         "Could not identify the connecting process: {}. Ensure Argus is running and retry from a normal terminal or IDE (not a stale subprocess).",

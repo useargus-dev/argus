@@ -24,7 +24,12 @@ dist-ssr
 *.sw?
 
 # Rust / Tauri
+/target/
 src-tauri/target/
+
+# WinDivert binaries (staged locally / in CI)
+third_party/windivert/*.dll
+third_party/windivert/*.sys
 
 # Argus local data (dev)
 .argus/

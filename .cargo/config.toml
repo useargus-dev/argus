@@ -1,0 +1,3 @@
+[env]
+# WinDivert SDK (WinDivert.dll, WinDivert.lib, WinDivert64.sys) — see third_party/windivert/README.md
+WINDIVERT_PATH = { value = "third_party/windivert", relative = true }

@@ -1,0 +1,21 @@
+[package]
+name = "ipc-client"
+version.workspace = true
+description = "Argus desktop IPC client for CLI sidecar"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+protocol = { path = "../protocol" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
+thiserror = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Pipes"] }

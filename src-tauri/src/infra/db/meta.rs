@@ -11,6 +11,8 @@ use crate::util::{fs as argus_fs, secure};
 
 const MIGRATION_BASE: &str = include_str!("migrations/001_base.sql");
 const MIGRATION_PROXY: &str = include_str!("migrations/002_proxy.sql");
+const MIGRATION_SANDBOX: &str = include_str!("migrations/003_sandbox.sql");
+const MIGRATION_SANDBOX_BOOT_ID: &str = include_str!("migrations/004_sandbox_boot_id.sql");
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct AccountMeta {
@@ -150,6 +152,26 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
             .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?1)",
+            [Utc::now().to_rfc3339()],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
+
+    if version < 3 {
+        conn.execute_batch(MIGRATION_SANDBOX)
+            .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?1)",
+            [Utc::now().to_rfc3339()],
+        )
+        .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+    }
+
+    if version < 4 {
+        conn.execute_batch(MIGRATION_SANDBOX_BOOT_ID)
+            .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (4, ?1)",
             [Utc::now().to_rfc3339()],
         )
         .map_err(|e| AppError::message("DB_ERROR", e.to_string()))?;

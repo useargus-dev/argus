@@ -102,10 +102,61 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: . -> target
 
       - name: Install frontend dependencies
         run: pnpm install
+
+      - name: Build sidecars (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cargo build --release -p argus-cli
+          node scripts/prepare-tauri-bundle.mjs macos
+
+      - name: Build sidecars (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          CARGO_NET_RETRY: 10
+          CARGO_HTTP_MULTIPLEXING: false
+        run: |
+          sudo apt-get install -y clang llvm libbpf-dev llvm-dev
+          export LIBCLANG_PATH=/usr/lib/llvm-14/lib
+          bash scripts/install-ebpf-toolchain.sh
+          cargo build --release -p argus-cli -p argus-redirector-linux
+          node scripts/prepare-tauri-bundle.mjs linux
+
+      - name: Build sidecars (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          cargo build --release -p argus-cli -p argus-redirector-windows
+          ./scripts/stage-windivert.ps1
+          node scripts/prepare-tauri-bundle.mjs windows
+
+      - name: Package sidecar tarballs (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          mkdir -p dist
+          tar -czf dist/argus-cli-x86_64-unknown-linux-gnu.tar.gz -C target/release argus-cli
+          tar -czf dist/argus-sandbox-linux-x86_64.tar.gz -C target/release argus-redirector-linux
+          cp scripts/install/*.sh dist/ || true
+
+      - name: Package sidecar zip (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path target/release/argus-cli.exe -DestinationPath dist/argus-cli-x86_64-pc-windows-msvc.zip -Force
+          ./scripts/stage-windivert.ps1
+          $stage = "dist/sandbox-win-staging"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item target/release/argus-redirector-windows.exe $stage
+          Copy-Item target/release/WinDivert.dll $stage -ErrorAction SilentlyContinue
+          Copy-Item target/release/WinDivert64.sys $stage -ErrorAction SilentlyContinue
+          Copy-Item third_party/windivert/WinDivert.dll $stage -ErrorAction SilentlyContinue
+          Copy-Item third_party/windivert/WinDivert64.sys $stage -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$stage/*" -DestinationPath dist/argus-sandbox-windows-x86_64.zip -Force
+          Copy-Item scripts/install/*.ps1 dist/ -ErrorAction SilentlyContinue
 
       - name: Import Apple certificate
         if: matrix.platform == 'macos-latest'

@@ -2,6 +2,9 @@ packages: []
 
 overrides:
   "brace-expansion@^1": "1.1.14"
+  "js-yaml": "4.2.0"
+  "esbuild": "0.28.1"
+  "@babel/core": "7.29.6"
 
 allowBuilds:
   esbuild: true
