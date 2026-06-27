@@ -14,6 +14,7 @@ use aya::programs::{links::CgroupAttachMode, CgroupSock, CgroupSockAddr};
 use log::{debug, warn, info, error};
 use prost::bytes::{Bytes, BytesMut};
 use tokio::net::UnixDatagram;
+use tokio::io::AsyncReadExt;
 use tokio::select;
 use mitmproxy::packet_sources::tun::create_tun_device;
 use tun::AbstractDevice;
@@ -104,14 +105,14 @@ async fn main() -> anyhow::Result<()> {
 
     let mut flow_pid = {
         let map = ebpf
-            .map_mut("FLOW_PID")
+            .take_map("FLOW_PID")
             .context("couldn't get FLOW_PID map")?;
         BpfHashMap::<_, FlowKeyPod, u32>::try_from(map).context("Cannot cast FLOW_PID to HashMap")?
     };
 
     let mut intercept_conf = {
         let map = ebpf
-            .map_mut("INTERCEPT_CONF")
+            .take_map("INTERCEPT_CONF")
             .context("couldn't get INTERCEPT_CONF map")?;
         Array::<_, ActionWrapper>::try_from(map)
             .context("Cannot cast INTERCEPT_CONF to Array")?
@@ -204,7 +205,7 @@ fn lookup_tunnel_info(
     flow_pid: &mut BpfHashMap<aya::maps::MapData, FlowKeyPod, u32>,
 ) -> Option<TunnelInfo> {
     let key = flow_key_from_ipv4_packet(data)?;
-    let pid = flow_pid.get(&FlowKeyPod(key), 0).ok().flatten()?;
+    let pid = flow_pid.get(&FlowKeyPod(key), 0).ok()?;
     Some(TunnelInfo {
         pid: Some(pid),
         process_name: None,
