@@ -15,51 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: backend
-    runs-on: ubuntu-22.04
-    env:
-      CARGO_NET_RETRY: 10
-      CARGO_HTTP_MULTIPLEXING: false
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Prepare platform-neutral Tauri bundle config
-        run: node scripts/prepare-tauri-bundle.mjs --dev linux --allow-missing
-
-      - name: Install Tauri system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf clang llvm libbpf-dev llvm-dev
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install nightly for eBPF
-        run: bash scripts/install-ebpf-toolchain.sh
-        env:
-          LIBCLANG_PATH: /usr/lib/llvm-14/lib
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-
-      - name: Compile workspace
-        run: cargo check --workspace --all-targets --exclude argus-redirector-windows
-
-      - name: Test Argus desktop
-        run: cargo test -p argus
-
-      - name: Test shared crates
-        run: |
-          cargo test -p protocol
-          cargo test -p ipc-client
-          cargo test -p process-tree
-
   sidecars-linux:
     name: sidecars-linux
     runs-on: ubuntu-22.04
@@ -104,3 +59,49 @@ jobs:
       - uses: swatinem/rust-cache@v2
       - name: Build Windows sidecars
         run: cargo build --release -p argus-cli -p argus-redirector-windows
+
+  backend:
+    name: backend
+    needs: [sidecars-linux, sidecars-windows]
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_NET_RETRY: 10
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare platform-neutral Tauri bundle config
+        run: node scripts/prepare-tauri-bundle.mjs --dev linux --allow-missing
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf clang llvm libbpf-dev llvm-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install nightly for eBPF
+        run: bash scripts/install-ebpf-toolchain.sh
+        env:
+          LIBCLANG_PATH: /usr/lib/llvm-14/lib
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Compile workspace
+        run: cargo check --workspace --all-targets --exclude argus-redirector-windows
+
+      - name: Test Argus desktop
+        run: cargo test -p argus
+
+      - name: Test shared crates
+        run: |
+          cargo test -p protocol
+          cargo test -p ipc-client
+          cargo test -p process-tree

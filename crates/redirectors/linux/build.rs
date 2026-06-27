@@ -4,32 +4,30 @@ use std::{
     ffi::OsString,
     fs,
     io::{BufRead as _, BufReader},
-    path::PathBuf,
-    process::{Child, Command, Stdio},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 #[cfg(target_os = "linux")]
 use anyhow::{anyhow, Context as _};
-#[cfg(target_os = "linux")]
-use cargo_metadata::{Artifact, CompilerMessage, Message, Target};
 
 #[cfg(not(target_os = "linux"))]
 fn main() {}
 
-const EBPF_PACKAGE: &str = "mitmproxy-linux-ebpf";
+const EBPF_BIN: &str = "mitmproxy-linux";
 
-/// Build mitmproxy-linux-ebpf with `build-std=core,panic_abort` (aya-build only passes `core`).
+/// Build mitmproxy-linux-ebpf with `build-std=core,panic_abort`.
+/// Do not list mitmproxy-linux-ebpf as a build-dependency: `cargo check --all-targets`
+/// would try to compile its no_std bin without nightly/build-std flags.
 #[cfg(target_os = "linux")]
 fn main() -> anyhow::Result<()> {
-    // Do not list mitmproxy-linux-ebpf as a build-dependency: `cargo check --all-targets`
-    // would try to compile its no_std bin without nightly/build-std flags.
     let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../../third_party/mitmproxy_rs/mitmproxy-linux-ebpf");
-    build_ebpf(EBPF_PACKAGE, &root_dir)
+    build_ebpf(EBPF_BIN, &root_dir)
 }
 
 #[cfg(target_os = "linux")]
-fn build_ebpf(name: &str, root_dir: &PathBuf) -> anyhow::Result<()> {
+fn build_ebpf(bin_name: &str, root_dir: &Path) -> anyhow::Result<()> {
     let root_dir = root_dir
         .canonicalize()
         .with_context(|| format!("ebpf crate not found at {}", root_dir.display()))?;
@@ -58,11 +56,12 @@ fn build_ebpf(name: &str, root_dir: &PathBuf) -> anyhow::Result<()> {
     } else {
         bpf_target_arch
     };
-    let target = format!("{target}-unknown-none");
+    let target_triple = format!("{target}-unknown-none");
 
     println!("cargo:rerun-if-changed={}", root_dir.display());
 
     let toolchain = env::var("ARGUS_EBPF_TOOLCHAIN").unwrap_or_else(|_| "nightly".into());
+    let target_dir = out_dir.join("ebpf-target");
 
     let mut cmd = Command::new("rustup");
     cmd.args([
@@ -73,14 +72,15 @@ fn build_ebpf(name: &str, root_dir: &PathBuf) -> anyhow::Result<()> {
         "--manifest-path",
         root_dir.join("Cargo.toml").to_str().unwrap(),
         "--package",
-        name,
+        "mitmproxy-linux-ebpf",
         "-Z",
         "build-std=core,panic_abort",
         "--bins",
-        "--message-format=json",
         "--release",
         "--target",
-        &target,
+        &target_triple,
+        "--target-dir",
+        target_dir.to_str().unwrap(),
     ]);
 
     const SEPARATOR: &str = "\x1f";
@@ -104,49 +104,16 @@ fn build_ebpf(name: &str, root_dir: &PathBuf) -> anyhow::Result<()> {
         cmd.env_remove(key);
     }
 
-    let target_dir = out_dir.join(name);
-    cmd.arg("--target-dir").arg(&target_dir);
-
+    cmd.stderr(Stdio::piped());
     let mut child = cmd
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("failed to spawn {cmd:?}"))?;
-    let Child { stdout, stderr, .. } = &mut child;
 
-    let stderr = stderr.take().expect("stderr");
+    let stderr = child.stderr.take().expect("stderr");
     let stderr = BufReader::new(stderr);
-    let stderr = std::thread::spawn(move || {
-        for line in stderr.lines() {
-            let line = line.expect("read line");
-            println!("cargo:warning={line}");
-        }
-    });
-
-    let stdout = stdout.take().expect("stdout");
-    let stdout = BufReader::new(stdout);
-    let mut executables = Vec::new();
-    for message in Message::parse_stream(stdout) {
-        match message.expect("valid JSON") {
-            Message::CompilerArtifact(Artifact {
-                executable,
-                target: Target { name, .. },
-                ..
-            }) => {
-                if let Some(executable) = executable {
-                    executables.push((name, executable.into_std_path_buf()));
-                }
-            }
-            Message::CompilerMessage(CompilerMessage { message, .. }) => {
-                for line in message.rendered.unwrap_or_default().split('\n') {
-                    println!("cargo:warning={line}");
-                }
-            }
-            Message::TextLine(line) => {
-                println!("cargo:warning={line}");
-            }
-            _ => {}
-        }
+    for line in stderr.lines() {
+        let line = line.expect("read line");
+        println!("cargo:warning={line}");
     }
 
     let status = child
@@ -156,16 +123,13 @@ fn build_ebpf(name: &str, root_dir: &PathBuf) -> anyhow::Result<()> {
         return Err(anyhow!("{cmd:?} failed: {status:?}"));
     }
 
-    match stderr.join() {
-        Ok(()) => {}
-        Err(err) => std::panic::resume_unwind(err),
-    }
-
-    for (name, binary) in executables {
-        let dst = out_dir.join(name);
-        fs::copy(&binary, &dst)
-            .with_context(|| format!("failed to copy {binary:?} to {dst:?}"))?;
-    }
+    let binary = target_dir
+        .join(&target_triple)
+        .join("release")
+        .join(bin_name);
+    let dst = out_dir.join(bin_name);
+    fs::copy(&binary, &dst)
+        .with_context(|| format!("failed to copy {} to {}", binary.display(), dst.display()))?;
 
     Ok(())
 }
