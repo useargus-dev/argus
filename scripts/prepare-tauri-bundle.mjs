@@ -18,7 +18,8 @@ const confPath = path.join(root, "src-tauri", "tauri.conf.json");
 
 const argv = process.argv.slice(2);
 const devMode = argv.includes("--dev");
-const platformArg = argv.find((a) => a !== "--dev");
+const allowMissing = argv.includes("--allow-missing");
+const platformArg = argv.find((a) => a !== "--dev" && a !== "--allow-missing");
 
 const platform =
   platformArg ||
@@ -62,7 +63,9 @@ function addReleaseBinary(baseName, dest, { required = false } = {}) {
   return false;
 }
 
-addReleaseBinary("argus-cli", sidecarDest("argus-cli"), { required: true });
+addReleaseBinary("argus-cli", sidecarDest("argus-cli"), {
+  required: !allowMissing,
+});
 
 if (!devMode) {
   if (platform === "linux") {

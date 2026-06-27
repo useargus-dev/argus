@@ -18,8 +18,18 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-22.04
+    env:
+      CARGO_NET_RETRY: 10
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare platform-neutral Tauri bundle config
+        run: node scripts/prepare-tauri-bundle.mjs --dev linux --allow-missing
 
       - name: Install Tauri system dependencies
         run: |
@@ -50,6 +60,8 @@ jobs:
   sidecars-linux:
     name: sidecars-linux
     runs-on: ubuntu-22.04
+    env:
+      CARGO_NET_RETRY: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -61,7 +73,12 @@ jobs:
           cargo install --locked bpf-linker@0.9.15
       - name: Build Linux sidecars
         run: |
-          cargo build --release -p argus-cli -p argus-redirector-linux
+          for attempt in 1 2 3; do
+            cargo build --release -p argus-cli -p argus-redirector-linux && exit 0
+            echo "cargo build failed (attempt $attempt/3); retrying in 15s..."
+            sleep 15
+          done
+          exit 1
 
   sidecars-windows:
     name: sidecars-windows
