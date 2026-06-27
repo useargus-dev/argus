@@ -10,7 +10,7 @@ use aya::maps::{Array, HashMap as BpfHashMap};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use aya::Btf;
-use aya::programs::{links::CgroupAttachMode, CgroupSock, CgroupSockConnect4};
+use aya::programs::{links::CgroupAttachMode, CgroupSock, CgroupSockAddr};
 use log::{debug, warn, info, error};
 use prost::bytes::{Bytes, BytesMut};
 use tokio::net::UnixDatagram;
@@ -60,7 +60,7 @@ fn load_bpf(device_index: u32) -> Result<Ebpf> {
         .context("failed to attach cgroup_sock_create program")?;
 
     debug!("Attaching BPF_CGROUP_INET4_CONNECT program...");
-    let connect: &mut CgroupSockConnect4 = ebpf
+    let connect: &mut CgroupSockAddr = ebpf
         .program_mut("cgroup_connect4")
         .context("failed to get cgroup_connect4")?
         .try_into()?;
