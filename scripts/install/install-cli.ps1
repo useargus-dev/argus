@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Asset = "argus-cli-x86_64-pc-windows-msvc.zip"
-$Base = "https://github.com/useargus/argus/releases"
+$Base = "https://github.com/useargus-dev/argus/releases"
 if ($Version -eq "latest") {
     $Url = "$Base/latest/download/$Asset"
 } else {

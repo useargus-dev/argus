@@ -28,7 +28,7 @@ if [[ "$OS" == "darwin" ]]; then
   ASSET="argus-cli-${ARCH}-apple-darwin.tar.gz"
 fi
 
-BASE="https://github.com/useargus/argus/releases"
+BASE="https://github.com/useargus-dev/argus/releases"
 if [[ "$VERSION" == "latest" ]]; then
   URL="${BASE}/latest/download/${ASSET}"
 else

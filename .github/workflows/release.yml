@@ -122,7 +122,13 @@ jobs:
           sudo apt-get install -y clang llvm libbpf-dev llvm-dev
           export LIBCLANG_PATH=/usr/lib/llvm-14/lib
           bash scripts/install-ebpf-toolchain.sh
-          cargo build --release -p argus-cli -p argus-redirector-linux
+          for attempt in 1 2 3; do
+            cargo build --release -p argus-cli -p argus-redirector-linux && break
+            echo "cargo build failed (attempt $attempt/3); retrying in 15s..."
+            sleep 15
+          done
+          test -x target/release/argus-cli
+          test -x target/release/argus-redirector-linux
           node scripts/prepare-tauri-bundle.mjs linux
 
       - name: Build sidecars (Windows)
@@ -141,6 +147,17 @@ jobs:
           tar -czf dist/argus-sandbox-linux-x86_64.tar.gz -C target/release argus-redirector-linux
           cp scripts/install/*.sh dist/ || true
 
+      - name: Upload sidecar assets (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ inputs.tag }}" \
+            dist/argus-cli-x86_64-unknown-linux-gnu.tar.gz \
+            dist/argus-sandbox-linux-x86_64.tar.gz \
+            dist/*.sh \
+            --clobber
+
       - name: Package sidecar zip (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
@@ -157,6 +174,18 @@ jobs:
           Copy-Item third_party/windivert/WinDivert64.sys $stage -ErrorAction SilentlyContinue
           Compress-Archive -Path "$stage/*" -DestinationPath dist/argus-sandbox-windows-x86_64.zip -Force
           Copy-Item scripts/install/*.ps1 dist/ -ErrorAction SilentlyContinue
+
+      - name: Upload sidecar assets (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ inputs.tag }}" `
+            dist/argus-cli-x86_64-pc-windows-msvc.zip `
+            dist/argus-sandbox-windows-x86_64.zip `
+            dist/*.ps1 `
+            --clobber
 
       - name: Import Apple certificate
         if: matrix.platform == 'macos-latest'
