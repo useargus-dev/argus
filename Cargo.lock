@@ -266,7 +266,6 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "aya",
- "aya-build",
  "aya-log",
  "cargo_metadata 0.23.1",
  "const-sha1",

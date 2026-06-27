@@ -17,13 +17,6 @@ edition = "2021"
 rust-version = "1.88"
 license = "AGPL-3.0-or-later"
 
-# Applies when building std/core via -Zbuild-std (eBPF); does not change normal workspace builds.
-[profile.dev.build-override]
-panic = "abort"
-
-[profile.release.build-override]
-panic = "abort"
-
 [workspace.dependencies]
 mitmproxy = { path = "third_party/mitmproxy_rs" }
 tokio = { version = "1.52", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net", "process", "signal"] }

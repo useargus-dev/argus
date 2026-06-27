@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 pub use intercept::{
-    argus_home, linux_redirector_path,
+    argus_home, linux_redirector_path, redirector_dir, windows_redirector_path,
 };
 
 pub fn redirector_path() -> PathBuf {

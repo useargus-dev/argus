@@ -71,7 +71,8 @@ fn build_ebpf(name: &str, root_dir: &str) -> anyhow::Result<()> {
     println!("cargo:rerun-if-changed={root_dir}");
     env::set_var("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_PANIC", "abort");
 
-    let toolchain = env::var("ARGUS_EBPF_TOOLCHAIN").unwrap_or_else(|_| "nightly".into());
+    let toolchain =
+        env::var("ARGUS_EBPF_TOOLCHAIN").unwrap_or_else(|_| "nightly-2026-04-01".into());
 
     let mut cmd = Command::new("rustup");
     cmd.args([

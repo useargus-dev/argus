@@ -26,15 +26,13 @@ verify_nightly_llvm() {
 install_nightly() {
   for attempt in 1 2 3; do
     rustup toolchain uninstall "${ARGUS_EBPF_TOOLCHAIN}" 2>/dev/null || true
-    rustup toolchain uninstall nightly 2>/dev/null || true
     if ! rustup toolchain install "${ARGUS_EBPF_TOOLCHAIN}" --profile minimal --component rust-src; then
       echo "nightly install failed (attempt ${attempt}/3); retrying in 15s..."
       sleep 15
       continue
     fi
-    rustup toolchain link nightly "${TOOLCHAIN_DIR}"
-    if ! rustc +nightly --version >/dev/null 2>&1; then
-      echo "nightly link failed (attempt ${attempt}/3); retrying in 15s..."
+    if ! rustc +"${ARGUS_EBPF_TOOLCHAIN}" --version >/dev/null 2>&1; then
+      echo "nightly unusable (attempt ${attempt}/3); retrying in 15s..."
       sleep 15
       continue
     fi
@@ -50,7 +48,7 @@ install_nightly() {
 
 install_bpf_linker() {
   for attempt in 1 2 3; do
-    if cargo +nightly install --locked bpf-linker@0.9.15; then
+    if cargo +"${ARGUS_EBPF_TOOLCHAIN}" install --locked bpf-linker@0.9.15; then
       return 0
     fi
     echo "bpf-linker install failed (attempt ${attempt}/3); retrying in 15s..."
