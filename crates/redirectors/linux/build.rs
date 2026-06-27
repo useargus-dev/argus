@@ -16,32 +16,24 @@ use cargo_metadata::{Artifact, CompilerMessage, Message, Target};
 #[cfg(not(target_os = "linux"))]
 fn main() {}
 
+const EBPF_PACKAGE: &str = "mitmproxy-linux-ebpf";
+
 /// Build mitmproxy-linux-ebpf with `build-std=core,panic_abort` (aya-build only passes `core`).
 #[cfg(target_os = "linux")]
 fn main() -> anyhow::Result<()> {
-    let cargo_metadata::Metadata { packages, .. } = cargo_metadata::MetadataCommand::new()
-        .no_deps()
-        .exec()
-        .context("MetadataCommand::exec")?;
-    let ebpf_package = packages
-        .into_iter()
-        .find(|cargo_metadata::Package { name, .. }| *name == "mitmproxy-linux-ebpf")
-        .ok_or_else(|| anyhow!("mitmproxy-linux-ebpf package not found"))?;
-    let cargo_metadata::Package {
-        name,
-        manifest_path,
-        ..
-    } = ebpf_package;
-    let root_dir = manifest_path
-        .parent()
-        .ok_or_else(|| anyhow!("no parent for {manifest_path}"))?
-        .as_str();
-
-    build_ebpf(name.as_str(), root_dir)
+    // Do not list mitmproxy-linux-ebpf as a build-dependency: `cargo check --all-targets`
+    // would try to compile its no_std bin without nightly/build-std flags.
+    let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../third_party/mitmproxy_rs/mitmproxy-linux-ebpf");
+    build_ebpf(EBPF_PACKAGE, &root_dir)
 }
 
 #[cfg(target_os = "linux")]
-fn build_ebpf(name: &str, root_dir: &str) -> anyhow::Result<()> {
+fn build_ebpf(name: &str, root_dir: &PathBuf) -> anyhow::Result<()> {
+    let root_dir = root_dir
+        .canonicalize()
+        .with_context(|| format!("ebpf crate not found at {}", root_dir.display()))?;
+
     let out_dir = env::var_os("OUT_DIR").ok_or(anyhow!("OUT_DIR not set"))?;
     let out_dir = PathBuf::from(out_dir);
 
@@ -68,7 +60,7 @@ fn build_ebpf(name: &str, root_dir: &str) -> anyhow::Result<()> {
     };
     let target = format!("{target}-unknown-none");
 
-    println!("cargo:rerun-if-changed={root_dir}");
+    println!("cargo:rerun-if-changed={}", root_dir.display());
 
     let toolchain = env::var("ARGUS_EBPF_TOOLCHAIN").unwrap_or_else(|_| "nightly".into());
 
@@ -78,6 +70,8 @@ fn build_ebpf(name: &str, root_dir: &str) -> anyhow::Result<()> {
         &toolchain,
         "cargo",
         "build",
+        "--manifest-path",
+        root_dir.join("Cargo.toml").to_str().unwrap(),
         "--package",
         name,
         "-Z",

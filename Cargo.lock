@@ -274,7 +274,6 @@ dependencies = [
  "libc",
  "log",
  "mitmproxy",
- "mitmproxy-linux-ebpf",
  "mitmproxy-linux-ebpf-common",
  "prost 0.14.4",
  "tokio",
@@ -676,39 +675,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "befef9fe882e63164a2ba0161874e954648a72b0e1c4b361f532d590638c4eec"
 dependencies = [
  "num_enum",
-]
-
-[[package]]
-name = "aya-log-ebpf"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a10bbadd0829895a91eb1cd2bb02d7af145704087f03812bed60cb9fe65dbb3"
-dependencies = [
- "aya-ebpf",
- "aya-log-common",
- "aya-log-ebpf-macros",
-]
-
-[[package]]
-name = "aya-log-ebpf-macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6d8251a75f56077db51892041aa6b77c70ef2723845d7a210979700b2f01bc4"
-dependencies = [
- "aya-log-common",
- "aya-log-parser",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "aya-log-parser"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14b102eb5c88c9aa0b49102d3fbcee08ecb0dfa81014f39b373311de7a7032cb"
-dependencies = [
- "aya-log-common",
 ]
 
 [[package]]
@@ -3746,16 +3712,6 @@ dependencies = [
  "tokio-util",
  "tun",
  "windows 0.61.3",
-]
-
-[[package]]
-name = "mitmproxy-linux-ebpf"
-version = "0.13.0-dev"
-dependencies = [
- "aya-ebpf",
- "aya-log-ebpf",
- "mitmproxy-linux-ebpf-common",
- "which",
 ]
 
 [[package]]
@@ -7612,15 +7568,6 @@ name = "weezl"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
-
-[[package]]
-name = "which"
-version = "8.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c789537cf2f7f55be8e6192f92e464174ee55f91af622777f7f1ceb0dbccd03e"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "whoami"

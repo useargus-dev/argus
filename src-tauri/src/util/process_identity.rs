@@ -33,11 +33,7 @@ fn read_boot_id(pid: u32) -> Option<String> {
 
 #[cfg(target_os = "linux")]
 fn probe_alive(pid: u32) -> bool {
-    nix::sys::signal::kill(
-        nix::unistd::Pid::from_raw(pid as i32),
-        None,
-    )
-    .is_ok()
+    std::path::Path::new(&format!("/proc/{pid}")).exists()
 }
 
 #[cfg(windows)]

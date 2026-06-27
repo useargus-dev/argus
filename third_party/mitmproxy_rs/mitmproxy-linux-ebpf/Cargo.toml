@@ -11,6 +11,9 @@ edition = "2024"
 rust-version = "1.88"
 publish = false
 
+# Built out-of-tree by argus-redirector-linux/build.rs; not a workspace member.
+[workspace]
+
 [dependencies]
 mitmproxy-linux-ebpf-common = { path = "../mitmproxy-linux-ebpf-common" }
 aya-ebpf = { version = "0.1.1", default-features = false }

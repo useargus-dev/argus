@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["third_party/mitmproxy_rs/mitmproxy-linux-ebpf"]
 members = [
     "src-tauri",
     "cli",
