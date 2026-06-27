@@ -37,16 +37,33 @@ function updateJson(file, mutator) {
 }
 
 function updateCargoToml() {
-  const file = path.join(root, "src-tauri", "Cargo.toml");
-  const text = fs.readFileSync(file, "utf8");
-  const pattern = /^version\s*=\s*"[^"]*"/m;
-  if (!pattern.test(text)) {
+  const appToml = path.join(root, "src-tauri", "Cargo.toml");
+  const appText = fs.readFileSync(appToml, "utf8");
+  const appPattern = /^version\s*=\s*"[^"]*"/m;
+  if (!appPattern.test(appText)) {
     console.error("Could not find [package].version in src-tauri/Cargo.toml");
     process.exit(1);
   }
-  const next = text.replace(pattern, `version = "${version}"`);
-  fs.writeFileSync(file, next, "utf8");
+  fs.writeFileSync(
+    appToml,
+    appText.replace(appPattern, `version = "${version}"`),
+    "utf8",
+  );
   console.log(`  src-tauri/Cargo.toml → ${version}`);
+
+  const workspaceToml = path.join(root, "Cargo.toml");
+  const workspaceText = fs.readFileSync(workspaceToml, "utf8");
+  const workspacePattern = /^version\s*=\s*"[^"]*"/m;
+  if (!workspacePattern.test(workspaceText)) {
+    console.error('Could not find [workspace.package].version in Cargo.toml');
+    process.exit(1);
+  }
+  fs.writeFileSync(
+    workspaceToml,
+    workspaceText.replace(workspacePattern, `version = "${version}"`),
+    "utf8",
+  );
+  console.log(`  Cargo.toml (workspace) → ${version}`);
 }
 
 console.log(`Setting release version to ${version} (from tag ${tag})`);

@@ -45,7 +45,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/useargus/argus/releases/latest/download/latest.json"
+        "https://github.com/useargus-dev/argus/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0NERDQ0RFNTUyODc4MjQKUldRa2VDaFYzc3hOeFBTemI2NjFNRDhTWUdZamlhWmFid1djNlFqWG1BMndnREJzTG1qYmlvWWUK"
     }

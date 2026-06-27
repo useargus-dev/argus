@@ -29,7 +29,7 @@ case "$ARCH" in
 esac
 
 ASSET="argus-sandbox-linux-${ARCH}.tar.gz"
-BASE="https://github.com/useargus/argus/releases"
+BASE="https://github.com/useargus-dev/argus/releases"
 if [[ "$VERSION" == "latest" ]]; then
   URL="${BASE}/latest/download/${ASSET}"
 else
