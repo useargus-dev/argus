@@ -26,6 +26,8 @@ pub async fn run(args: StatusArgs) -> anyhow::Result<()> {
     if connected {
         println!("✓ Argus IPC reachable at {endpoint}");
         println!("  Ready for `argus run` (approve CLI access if prompted).");
+        #[cfg(target_os = "macos")]
+        println!("  Note: network capture is not supported on macOS yet (use --no-proxy for secrets-only).");
     } else {
         println!("✗ Argus not reachable at {endpoint}");
         println!("  Start Argus, sign in, then retry.");

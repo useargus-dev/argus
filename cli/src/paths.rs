@@ -5,7 +5,8 @@ pub use intercept::argus_home;
 #[cfg(target_os = "linux")]
 pub use intercept::linux_redirector_path;
 #[cfg(windows)]
-pub use intercept::{redirector_dir, windows_redirector_path};
+pub use intercept::windows_redirector_path;
+pub use intercept::redirector_dir;
 
 pub fn redirector_path() -> PathBuf {
     #[cfg(target_os = "linux")]

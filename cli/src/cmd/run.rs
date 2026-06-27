@@ -49,8 +49,21 @@ pub async fn run(args: RunArgs) -> Result<()> {
         .map(|p| p.display().to_string());
 
     if args.dry_run {
+        #[cfg(target_os = "macos")]
+        if !args.no_proxy {
+            println!("Note: network capture is not supported on macOS yet.");
+            println!("  Use --no-proxy for secrets-only mode, or Linux/Windows for full capture.");
+        }
         print_dry_run(&bucket.bucket_id, &args)?;
         return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    if !args.no_proxy {
+        anyhow::bail!(
+            "argus run network capture is not supported on macOS yet. \
+             Use --no-proxy to run with injected secrets only, or use Linux or Windows for full sandbox capture."
+        );
     }
 
     let session = sandbox_create(
