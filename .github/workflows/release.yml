@@ -115,9 +115,17 @@ jobs:
 
       - name: Build sidecars (Linux)
         if: matrix.platform == 'ubuntu-22.04'
+        env:
+          CARGO_NET_RETRY: 10
+          CARGO_HTTP_MULTIPLEXING: false
         run: |
           sudo apt-get install -y clang llvm libbpf-dev
-          cargo install --locked bpf-linker@0.9.15
+          rustup toolchain install nightly --profile minimal --component rust-src
+          for attempt in 1 2 3; do
+            cargo install --locked bpf-linker@0.9.15 && break
+            echo "bpf-linker install failed (attempt $attempt/3); retrying..."
+            sleep 15
+          done
           cargo build --release -p argus-cli -p argus-redirector-linux
           node scripts/prepare-tauri-bundle.mjs linux
 

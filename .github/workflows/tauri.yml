@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       CARGO_NET_RETRY: 10
+      CARGO_HTTP_MULTIPLEXING: false
     steps:
       - uses: actions/checkout@v4
 
@@ -36,17 +37,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf clang llvm libbpf-dev
 
-      - name: Install bpf-linker
-        run: cargo install --locked bpf-linker@0.9.15
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install nightly for eBPF
+        run: rustup toolchain install nightly --profile minimal --component rust-src
+
+      - name: Install bpf-linker
+        run: |
+          for attempt in 1 2 3; do
+            cargo install --locked bpf-linker@0.9.15 && exit 0
+            echo "bpf-linker install failed (attempt $attempt/3); retrying in 15s..."
+            sleep 15
+          done
+          exit 1
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
       - name: Compile workspace
-        run: cargo check --workspace --all-targets
+        run: cargo check --workspace --all-targets --exclude argus-redirector-windows
 
       - name: Test Argus desktop
         run: cargo test -p argus
@@ -62,15 +72,32 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       CARGO_NET_RETRY: 10
+      CARGO_HTTP_MULTIPLEXING: false
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install nightly for eBPF
+        run: rustup toolchain install nightly --profile minimal --component rust-src
+
       - uses: swatinem/rust-cache@v2
+
       - name: Install BPF build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y clang llvm libbpf-dev
-          cargo install --locked bpf-linker@0.9.15
+
+      - name: Install bpf-linker
+        run: |
+          for attempt in 1 2 3; do
+            cargo install --locked bpf-linker@0.9.15 && exit 0
+            echo "bpf-linker install failed (attempt $attempt/3); retrying in 15s..."
+            sleep 15
+          done
+          exit 1
+
       - name: Build Linux sidecars
         run: |
           for attempt in 1 2 3; do
@@ -83,6 +110,8 @@ jobs:
   sidecars-windows:
     name: sidecars-windows
     runs-on: windows-latest
+    env:
+      CARGO_NET_RETRY: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
