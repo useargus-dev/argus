@@ -1,5 +1,6 @@
-# Repair Argus PATH + ARGUS_HOME after a broken or partial NSIS install.
-# Run in an elevated PowerShell for machine-wide PATH updates.
+# Repair Argus CLI registration after a partial NSIS install.
+# Does NOT modify the Path environment variable.
+# Run elevated to refresh machine ARGUS_HOME + App Paths.
 param(
     [string]$InstallRoot = ""
 )
@@ -22,31 +23,31 @@ function Get-ArgusInstallRoot {
     throw "Could not determine Argus install directory. Pass -InstallRoot."
 }
 
-function Add-PathEntry {
-    param(
-        [string]$Scope,
-        [string]$Entry
-    )
-    $current = [Environment]::GetEnvironmentVariable("Path", $Scope)
-    $parts = @()
-    if ($current) { $parts = $current -split ';' | Where-Object { $_ } }
-    $exists = $parts | Where-Object { $_.TrimEnd('\').Equals($Entry, [StringComparison]::OrdinalIgnoreCase) }
-    if ($exists) {
-        Write-Host "[$Scope] PATH already contains $Entry"
-        return
-    }
-    $updated = if ($parts.Count -gt 0) { ($parts + $Entry) -join ';' } else { $Entry }
-    [Environment]::SetEnvironmentVariable("Path", $updated, $Scope)
-    Write-Host "[$Scope] Added to PATH: $Entry"
-}
-
 function Set-ArgusHomeEnv {
-    param(
-        [string]$Scope,
-        [string]$HomeDir
-    )
+    param([string]$Scope, [string]$HomeDir)
     [Environment]::SetEnvironmentVariable("ARGUS_HOME", $HomeDir, $Scope)
     Write-Host "[$Scope] Set ARGUS_HOME=$HomeDir"
+}
+
+function Register-AppPath {
+    param([string]$CliExe, [string]$BinDir)
+    $key = "HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths\argus.exe"
+    New-Item -Path $key -Force | Out-Null
+    Set-ItemProperty -Path $key -Name "(default)" -Value $CliExe
+    Set-ItemProperty -Path $key -Name "Path" -Value $BinDir
+    Write-Host "[Machine] Registered App Paths: $CliExe"
+}
+
+function Install-UserShim {
+    param([string]$CliExe)
+    $windowsApps = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps"
+    New-Item -ItemType Directory -Force -Path $windowsApps | Out-Null
+    $shim = Join-Path $windowsApps "argus.cmd"
+    @(
+        "@echo off"
+        "`"$CliExe`" %*"
+    ) | Set-Content -Path $shim -Encoding ASCII
+    Write-Host "[User] Installed CLI shim: $shim"
 }
 
 $root = Get-ArgusInstallRoot -Override $InstallRoot
@@ -61,14 +62,14 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
     [Security.Principal.WindowsBuiltInRole]::Administrator
 )
 
-Add-PathEntry -Scope User -Entry $bin
 Set-ArgusHomeEnv -Scope User -HomeDir $root
+Install-UserShim -CliExe $cli
 
 if ($isAdmin) {
-    Add-PathEntry -Scope Machine -Entry $bin
     Set-ArgusHomeEnv -Scope Machine -HomeDir $root
+    Register-AppPath -CliExe $cli -BinDir $bin
 } else {
-    Write-Warning "Not elevated: updated user PATH/ARGUS_HOME only. Re-run as Administrator for system PATH."
+    Write-Warning "Not elevated: user shim + ARGUS_HOME only. Re-run as Administrator for App Paths."
 }
 
 $signature = @"
@@ -83,6 +84,6 @@ Add-Type -MemberDefinition $signature -Name Win32SendMessage -Namespace Win32 -E
     [IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$result)
 
 Write-Host ""
-Write-Host "Repair complete. Open a NEW terminal, then run: argus"
+Write-Host "Repair complete (Path env var untouched). Open a NEW terminal, then run: argus"
 Write-Host "  Install root: $root"
 Write-Host "  CLI:          $cli"

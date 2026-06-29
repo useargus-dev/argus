@@ -25,7 +25,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "nsis", "dmg"],
+    "targets": [
+      "deb",
+      "rpm",
+      "nsis",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -33,7 +38,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": {},
+    "resources": {
+      "../target/release/argus-cli.exe": "lib/argus/argus-cli.exe",
+      "../target/release/argus-redirector-windows.exe": "lib/argus/argus-redirector-windows.exe",
+      "../third_party/windivert/WinDivert.dll": "lib/argus/WinDivert.dll",
+      "../third_party/windivert/WinDivert64.sys": "lib/argus/WinDivert64.sys"
+    },
     "linux": {
       "deb": {
         "postInstallScript": "./linux/postinst.sh",
