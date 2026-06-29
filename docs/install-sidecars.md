@@ -15,7 +15,7 @@ GitHub releases ship **full installers only** — no standalone CLI/sandbox scri
 | Linux | `/usr/local/bin/argus` → `{ARGUS_HOME}/lib/argus/argus-cli` | `{ARGUS_HOME}/lib/argus/argus-redirector-linux` | `/usr/lib/argus` (set in `/etc/profile.d/argus.sh`) |
 | Windows | `{ARGUS_HOME}\bin\argus.exe` (from bundled `argus-cli.exe`) | `{ARGUS_HOME}\lib\argus\argus-redirector-windows.exe` + WinDivert | `%ProgramFiles%\argus` (`ARGUS_HOME` env + registry `InstallPath`) |
 
-The Windows NSIS installer sets `ARGUS_HOME` in **user and system** environment variables, writes `InstallPath` to HKCU/HKLM, and adds `{ARGUS_HOME}\bin` to **user and system PATH**. Linux package postinst symlinks the CLI into `/usr/local/bin` and exports `ARGUS_HOME` for login shells.
+The Windows NSIS installer sets `ARGUS_HOME` (user + machine), registers **App Paths** for `argus.exe`, and drops `argus.cmd` into `%LOCALAPPDATA%\Microsoft\WindowsApps` (typically already on user Path). **It does not modify the Path environment variable.** Linux package postinst symlinks the CLI into `/usr/local/bin` and exports `ARGUS_HOME` for login shells.
 
 ## Dev / CI refresh (not on releases)
 
