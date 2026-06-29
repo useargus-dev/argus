@@ -132,7 +132,10 @@ jobs:
       - name: Build sidecars (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
+        env:
+          WINDIVERT_PATH: ${{ github.workspace }}/third_party/windivert
         run: |
+          ./scripts/fetch-windivert.ps1
           cargo build --release -p argus-cli -p argus-redirector-windows
           ./scripts/stage-windivert.ps1
           node scripts/prepare-tauri-bundle.mjs windows
