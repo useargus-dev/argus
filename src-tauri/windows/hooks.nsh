@@ -77,6 +77,26 @@
 
   Push "$INSTDIR"
   Call ArgusSetArgusHomeEnv
+
+  ; Verify PATH was applied (append-only should always succeed unless PATH is corrupt).
+  StrCpy $R8 ""
+  ReadRegStr $R9 HKCU "Environment" "Path"
+  Push $R9
+  Push "$INSTDIR\bin"
+  Call ArgusStrStr
+  Pop $R8
+  StrCmp $R8 "" 0 path_ok
+  ReadRegStr $R9 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "Path"
+  Push $R9
+  Push "$INSTDIR\bin"
+  Call ArgusStrStr
+  Pop $R8
+  StrCmp $R8 "" 0 path_ok
+  MessageBox MB_OK|MB_ICONEXCLAMATION "Argus installed but could not add $INSTDIR\bin to PATH.$\n$\nOpen PowerShell as Administrator and run:$\n  scripts\repair-windows-path.ps1$\n$\nOr add $INSTDIR\bin to PATH manually, then open a new terminal."
+  Goto path_done
+  path_ok:
+  DetailPrint "PATH verified: $INSTDIR\bin"
+  path_done:
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
@@ -146,13 +166,96 @@ FunctionEnd
   Pop $R1
 !macroend
 
-; Stack: path -> returns "1" on stack if path contains System32
+; Stack: path -> returns "1" on stack if path contains a System32 directory entry
 Function ArgusPathHasSystem32
+  Exch $R1
+  Push $R2
+  StrCpy $R0 ""
+  ; Windows PATH entries usually end with \system32 before ; or end-of-string, not \system32\
   !insertmacro ArgusPathHasSystem32Impl "ArgusStrStr"
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\Windows\system32"
+  Call ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\Windows\System32"
+  Call ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\WINDOWS\system32"
+  Call ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\WINDOWS\System32"
+  Call ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push "\system32;"
+  Call ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push "\System32;"
+  Call ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Goto done
+  found:
+  StrCpy $R0 "1"
+  done:
+  Push $R0
+  Pop $R1
 FunctionEnd
 
 Function un.ArgusPathHasSystem32
+  Exch $R1
+  Push $R2
+  StrCpy $R0 ""
   !insertmacro ArgusPathHasSystem32Impl "un.ArgusStrStr"
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\Windows\system32"
+  Call un.ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\Windows\System32"
+  Call un.ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\WINDOWS\system32"
+  Call un.ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push ":\WINDOWS\System32"
+  Call un.ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push "\system32;"
+  Call un.ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Push $R1
+  Push "\System32;"
+  Call un.ArgusStrStr
+  Pop $R2
+  StrCmp $R2 "" 0 found
+  Goto done
+  found:
+  StrCpy $R0 "1"
+  done:
+  Push $R0
+  Pop $R1
 FunctionEnd
 
 Function un.ArgusStrStr
@@ -325,18 +428,11 @@ Function ArgusAddToMachinePath
   Call ArgusPathLooksCorrupt
   Pop $R2
   StrCmp $R2 "" 0 machine_corrupt
-  Call ArgusEnsureMachinePathBase
+  ; Append-only: never replace the machine PATH wholesale.
   Push $R1
   Push $R0
   Call ArgusAppendDirIfMissing
   Pop $R1
-  Push $R1
-  Call ArgusPathHasSystem32
-  Pop $R2
-  StrCmp $R2 "" 0 machine_write
-  DetailPrint "Error: refusing to write machine PATH without System32; skipped PATH update"
-  Goto machine_done
-  machine_write:
   Push $R1
   Call ArgusPathLooksCorrupt
   Pop $R2
