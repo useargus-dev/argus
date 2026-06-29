@@ -1,4 +1,4 @@
-; Post-install: InstallPath registry, bin\argus.exe shim, PATH (HKCU + HKLM).
+; Post-install: InstallPath registry, ARGUS_HOME env, bin\argus.exe shim, PATH (HKCU + HKLM).
 ; Per-machine NSIS install adds argus\bin to system PATH (Program Files).
 ; Tauri 2 bundles sidecars at $INSTDIR\lib\argus\ (beside the main exe, not under resources\).
 ; PATH helpers NEVER replace the entire machine PATH with only argus\bin.
@@ -74,10 +74,14 @@
   WriteRegStr HKLM "Software\Argus" "InstallPath" "$INSTDIR"
   Push "$INSTDIR\bin"
   Call ArgusAddToMachinePath
+
+  Push "$INSTDIR"
+  Call ArgusSetArgusHomeEnv
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
   SetRegView 64
+  Call un.ArgusRemoveArgusHomeEnv
   Push "$INSTDIR\bin"
   Call un.ArgusRemoveFromUserPath
   Push "$INSTDIR\bin"
@@ -347,6 +351,24 @@ Function ArgusAddToMachinePath
   Pop $R2
   Pop $R1
   Exch $R0
+FunctionEnd
+
+; --- ARGUS_HOME environment variable (HKCU + HKLM, matches Linux profile.d) ---
+
+Function ArgusSetArgusHomeEnv
+  Exch $R0 ; install directory
+  WriteRegExpandStr HKCU "Environment" "ARGUS_HOME" "$R0"
+  WriteRegExpandStr HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "ARGUS_HOME" "$R0"
+  SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+  DetailPrint "Set ARGUS_HOME=$R0 (user + machine)"
+  Exch $R0
+FunctionEnd
+
+Function un.ArgusRemoveArgusHomeEnv
+  DeleteRegValue HKCU "Environment" "ARGUS_HOME"
+  DeleteRegValue HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "ARGUS_HOME"
+  SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+  DetailPrint "Removed ARGUS_HOME"
 FunctionEnd
 
 ; --- Uninstall PATH helpers (un. prefix required) ---
