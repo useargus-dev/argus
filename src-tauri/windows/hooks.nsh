@@ -1,6 +1,6 @@
-; Post-install: InstallPath registry, bin\argus.exe shim, PATH (HKCU + HKLM when per-machine).
+; Post-install: InstallPath registry, bin\argus.exe shim, PATH (HKCU + HKLM).
+; Per-machine NSIS install adds argus\bin to system PATH (Program Files).
 ; Tauri 2 bundles sidecars at $INSTDIR\lib\argus\ (beside the main exe, not under resources\).
-; Per-user installs (under %LOCALAPPDATA%) use HKCU only; per-machine also writes HKLM.
 ; PATH helpers NEVER replace the entire machine PATH with only argus\bin.
 ; Uninstall helpers must use the un. prefix (NSIS requirement in uninstall sections).
 
@@ -27,13 +27,43 @@
     Delete "$INSTDIR\lib\argus\argus-redirector-windows"
   ${EndIf}
 
+  ; Require full sidecar stack (matches Linux postinst).
+  StrCpy $R9 ""
+  ${If} ${FileExists} "$INSTDIR\lib\argus\argus-cli.exe"
+    StrCpy $R9 "1"
+  ${ElseIf} ${FileExists} "$INSTDIR\resources\lib\argus\argus-cli.exe"
+    StrCpy $R9 "1"
+  ${EndIf}
+  StrCmp $R9 "1" cli_bundle_ok
+    MessageBox MB_OK|MB_ICONSTOP "Argus install incomplete: CLI sidecar missing.$\n$\nDownload and run the full setup.exe installer from GitHub releases."
+    Abort
+  cli_bundle_ok:
+
   ; CLI sidecar -> bin\argus.exe for terminal use
   ${If} ${FileExists} "$INSTDIR\lib\argus\argus-cli.exe"
     CopyFiles /SILENT "$INSTDIR\lib\argus\argus-cli.exe" "$INSTDIR\bin\argus.exe"
-  ${ElseIf} ${FileExists} "$INSTDIR\resources\lib\argus\argus-cli.exe"
-    CopyFiles /SILENT "$INSTDIR\resources\lib\argus\argus-cli.exe" "$INSTDIR\bin\argus.exe"
   ${Else}
-    DetailPrint "Warning: argus-cli.exe sidecar not found; CLI not installed to bin\"
+    CopyFiles /SILENT "$INSTDIR\resources\lib\argus\argus-cli.exe" "$INSTDIR\bin\argus.exe"
+  ${EndIf}
+
+  StrCpy $R9 ""
+  ${If} ${FileExists} "$INSTDIR\lib\argus\argus-redirector-windows.exe"
+    StrCpy $R9 "1"
+  ${ElseIf} ${FileExists} "$INSTDIR\resources\lib\argus\argus-redirector-windows.exe"
+    StrCpy $R9 "1"
+  ${EndIf}
+  StrCmp $R9 "1" redir_bundle_ok
+    MessageBox MB_OK|MB_ICONSTOP "Argus install incomplete: redirector missing.$\n$\nDownload and run the full setup.exe installer from GitHub releases."
+    Abort
+  redir_bundle_ok:
+
+  ${IfNot} ${FileExists} "$INSTDIR\lib\argus\WinDivert.dll"
+    MessageBox MB_OK|MB_ICONSTOP "Argus install incomplete: WinDivert.dll missing.$\n$\nDownload and run the full setup.exe installer from GitHub releases."
+    Abort
+  ${EndIf}
+  ${IfNot} ${FileExists} "$INSTDIR\lib\argus\WinDivert64.sys"
+    MessageBox MB_OK|MB_ICONSTOP "Argus install incomplete: WinDivert64.sys missing.$\n$\nDownload and run the full setup.exe installer from GitHub releases."
+    Abort
   ${EndIf}
 
   ; Always register for the installing user (works without admin elevation).
@@ -41,15 +71,9 @@
   Push "$INSTDIR\bin"
   Call ArgusAddToUserPath
 
-  ; Per-machine scope: install dir not under %LOCALAPPDATA% (Program Files, custom drive, etc.)
-  ReadEnvStr $R5 "LOCALAPPDATA"
-  StrLen $R6 $R5
-  StrCpy $R7 $INSTDIR $R6
-  StrCmp $R7 $R5 user_only_scope
-    WriteRegStr HKLM "Software\Argus" "InstallPath" "$INSTDIR"
-    Push "$INSTDIR\bin"
-    Call ArgusAddToMachinePath
-  user_only_scope:
+  WriteRegStr HKLM "Software\Argus" "InstallPath" "$INSTDIR"
+  Push "$INSTDIR\bin"
+  Call ArgusAddToMachinePath
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL

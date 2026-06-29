@@ -9,6 +9,6 @@ sudo install -m 644 org.argus.redirector.policy \
   /usr/share/polkit-1/actions/org.argus.redirector.policy
 ```
 
-Adjust the `exec.path` annotation if Argus is installed outside `/opt/Argus`.
+Adjust the `exec.path` annotation if Argus is installed outside `/usr/lib/argus` (default deb/rpm layout).
 
 `argus run` still uses `sudo` by default (mitmproxy transparent mode). Polkit integration for `pkexec` can be added in a future release; the policy documents the intended action ID for distro packages.

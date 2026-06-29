@@ -72,6 +72,7 @@ if (!devMode) {
     addReleaseBinary(
       "argus-redirector-linux",
       sidecarDest("argus-redirector-linux"),
+      { required: true },
     );
   }
 
@@ -79,6 +80,7 @@ if (!devMode) {
     addReleaseBinary(
       "argus-redirector-windows",
       sidecarDest("argus-redirector-windows"),
+      { required: true },
     );
     const windivertDir = path.join(root, "third_party", "windivert");
     for (const f of ["WinDivert.dll", "WinDivert64.sys"]) {
@@ -86,7 +88,10 @@ if (!devMode) {
       if (fs.existsSync(staged)) {
         resources[`../third_party/windivert/${f}`] = `lib/argus/${f}`;
       } else {
-        console.warn(`prepare-tauri-bundle: missing ${staged}`);
+        console.error(
+          `prepare-tauri-bundle: missing ${staged} (run scripts/stage-windivert.ps1 after building redirector)`,
+        );
+        process.exit(1);
       }
     }
   }

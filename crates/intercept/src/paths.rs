@@ -12,11 +12,11 @@ pub fn argus_home() -> PathBuf {
         if let Ok(path) = registry_win::read_install_path_registry() {
             return path;
         }
-        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            return PathBuf::from(local).join("Argus");
-        }
     }
     if let Ok(exe) = std::env::current_exe() {
+        if let Some(home) = argus_home_from_sidecar_exe(&exe) {
+            return home;
+        }
         if let Some(parent) = exe.parent() {
             for home in install_dir_candidates(parent) {
                 if home.join("lib").join("argus").exists() {
@@ -27,12 +27,37 @@ pub fn argus_home() -> PathBuf {
     }
     #[cfg(unix)]
     {
-        return PathBuf::from("/opt/Argus");
+        for candidate in ["/usr/lib/argus", "/opt/Argus"] {
+            let path = PathBuf::from(candidate);
+            if path.join("lib").join("argus").exists() {
+                return path;
+            }
+        }
     }
     #[cfg(windows)]
     {
-        PathBuf::from(r"C:\Program Files\Argus")
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            return PathBuf::from(local).join("argus");
+        }
+        return PathBuf::from(r"C:\Program Files\argus");
     }
+    #[cfg(unix)]
+    {
+        PathBuf::from("/usr/lib/argus")
+    }
+}
+
+/// Resolve install root when the running binary lives under `{home}/lib/argus/`.
+fn argus_home_from_sidecar_exe(exe: &Path) -> Option<PathBuf> {
+    let sidecar_dir = exe.parent()?;
+    if sidecar_dir.file_name()?.to_str()? != "argus" {
+        return None;
+    }
+    let lib_dir = sidecar_dir.parent()?;
+    if lib_dir.file_name()?.to_str()? != "lib" {
+        return None;
+    }
+    lib_dir.parent().map(PathBuf::from)
 }
 
 /// Candidate install roots when resolving from the running executable path.

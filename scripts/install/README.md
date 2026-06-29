@@ -1,6 +1,7 @@
-# Argus standalone install scripts
+# Argus standalone install scripts (dev/CI only)
 
-Optional refresh/CI installers for sidecars shipped by default with the desktop app.
+These scripts are for local refresh and CI — **not published on GitHub releases**. End users should install the full desktop bundle (`.deb`, `.rpm`, NSIS `.exe`, `.dmg`) which includes the app, CLI, and redirector with PATH setup.
+
 See [install-sidecars.md](../docs/install-sidecars.md).
 
 ## Scripts
@@ -18,5 +19,3 @@ See [install-sidecars.md](../docs/install-sidecars.md).
 | `--version v0.3.0` | Pin release tag |
 | `--prefix ~/.local` | Install location |
 | `--dry-run` | Print URLs and paths only |
-
-Release assets: `argus-cli-*`, `argus-sandbox-*` on GitHub releases.
