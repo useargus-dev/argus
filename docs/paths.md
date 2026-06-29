@@ -8,9 +8,12 @@ Set by the installer or dev workflow. Contains bundled binaries:
 
 | Path | Contents |
 |------|----------|
+| `{ARGUS_HOME}/lib/argus/argus-cli` | CLI sidecar (`argus run`, Linux) |
 | `{ARGUS_HOME}/lib/argus/argus-cli.exe` | CLI sidecar (`argus run`, Windows) |
 | `{ARGUS_HOME}/lib/argus/argus-redirector-windows.exe` | WinDivert redirector (Windows) |
 | `{ARGUS_HOME}/lib/argus/argus-redirector-linux` | eBPF redirector (Linux) |
+
+Linux packages install under `/usr/lib/argus`; Windows per-machine NSIS installs under `%ProgramFiles%\argus`. The CLI on PATH is `/usr/local/bin/argus` (Linux) or `{ARGUS_HOME}\bin\argus.exe` (Windows).
 
 Dev default when building locally: `argus/target/debug` with `lib/argus/` staged beside `argus-cli.exe`.
 

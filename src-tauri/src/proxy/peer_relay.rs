@@ -150,7 +150,13 @@ fn argus_home() -> PathBuf {
     }
     #[cfg(unix)]
     {
-        PathBuf::from("/opt/Argus")
+        for candidate in ["/usr/lib/argus", "/opt/Argus"] {
+            let path = PathBuf::from(candidate);
+            if path.join("lib").join("argus").exists() {
+                return path;
+            }
+        }
+        PathBuf::from("/usr/lib/argus")
     }
 }
 

@@ -1,40 +1,25 @@
-# Installing Argus sidecars (CLI + sandbox redirector)
+# Installing Argus (desktop + CLI + redirector)
 
-Every **standard Argus desktop install** ships the CLI and platform redirector automatically. Use standalone installers only to refresh sidecars without reinstalling the GUI.
+GitHub releases ship **full installers only** — no standalone CLI/sandbox scripts or sidecar archives.
+
+| Platform | Installer | What you get |
+|----------|-----------|--------------|
+| Windows | `argus_*_x64-setup.exe` (NSIS) | Desktop app, `argus` CLI on system PATH, WinDivert redirector |
+| Linux | `.deb` or `.rpm` | Desktop app, `/usr/local/bin/argus`, eBPF redirector |
+| macOS | `.dmg` | Desktop app (CLI/`argus run` capture not supported on macOS yet) |
 
 ## Bundled layout
 
-| Platform | CLI | Redirector |
-|----------|-----|------------|
-| Linux | `/usr/local/bin/argus` (symlink from `argus-cli`) | `$ARGUS_HOME/lib/argus/argus-redirector-linux` |
-| Windows | `%ProgramFiles%\Argus\bin\argus.exe` or `%LOCALAPPDATA%\argus\bin\argus.exe` (from bundled `argus-cli.exe`) | `{ARGUS_HOME}/lib/argus/argus-redirector-windows.exe` + WinDivert |
+| Platform | CLI | Redirector | `ARGUS_HOME` |
+|----------|-----|------------|--------------|
+| Linux | `/usr/local/bin/argus` → `{ARGUS_HOME}/lib/argus/argus-cli` | `{ARGUS_HOME}/lib/argus/argus-redirector-linux` | `/usr/lib/argus` (set in `/etc/profile.d/argus.sh`) |
+| Windows | `{ARGUS_HOME}\bin\argus.exe` (from bundled `argus-cli.exe`) | `{ARGUS_HOME}\lib\argus\argus-redirector-windows.exe` + WinDivert | `%ProgramFiles%\argus` (per-machine NSIS; also in registry) |
 
-`ARGUS_HOME` defaults to the desktop install directory. Windows sets `InstallPath` under `HKCU` (per-user install) and/or `HKLM` (per-machine install). The NSIS installer adds `bin` to the user PATH always, and to machine PATH for per-machine installs.
+The Windows NSIS installer writes `InstallPath` to HKCU and HKLM and adds `{ARGUS_HOME}\bin` to **user and system PATH**. Linux package postinst symlinks the CLI into `/usr/local/bin` and exports `ARGUS_HOME` for login shells.
 
-## Standalone install scripts
+## Dev / CI refresh (not on releases)
 
-From [argus/scripts/install/](../scripts/install/):
-
-```bash
-# Linux / macOS — CLI only
-curl -fsSL https://get.argus.dev/install-cli.sh | sh
-
-# Linux — redirector only
-curl -fsSL https://get.argus.dev/install-sandbox.sh | sh
-
-# CLI + redirector
-curl -fsSL https://get.argus.dev/install-sidecars.sh | sh
-```
-
-```powershell
-# Windows — CLI only
-irm https://get.argus.dev/install-cli.ps1 | iex
-
-# Windows — redirector + WinDivert
-irm https://get.argus.dev/install-sandbox.ps1 | iex
-```
-
-Flags: `--version v0.2.1`, `--prefix ~/.local`, `--dry-run`.
+For local sidecar refresh without reinstalling the GUI, use scripts under [argus/scripts/install/](../scripts/install/) — these are **not published** on GitHub releases.
 
 ## Troubleshooting
 
@@ -44,7 +29,8 @@ Flags: `--version v0.2.1`, `--prefix ~/.local`, `--dry-run`.
 | `PROXY_DISABLED` | Enable proxy on bucket in Argus app |
 | Linux sudo denied / no TTY | Approve sudo when prompted, configure polkit ([packaging/linux/README.md](../packaging/linux/README.md)), or use `--no-proxy` |
 | Windows UAC denied | Approve the Administrator prompt for `argus-redirector-windows.exe`, or use `--no-proxy` |
-| `argus-redirector-linux not found` | Reinstall desktop bundle or run `install-sandbox.sh` |
+| `argus-redirector-linux not found` | Reinstall the `.deb`/`.rpm` bundle (redirector is bundled; standalone archives are not published) |
+| `argus` not found after Windows install | Use `*_setup.exe` (not MSI), open a **new** terminal after install |
 
 ## Code signing (Windows)
 
