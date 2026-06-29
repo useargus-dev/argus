@@ -13,7 +13,7 @@ Set by the installer or dev workflow. Contains bundled binaries:
 | `{ARGUS_HOME}/lib/argus/argus-redirector-windows.exe` | WinDivert redirector (Windows) |
 | `{ARGUS_HOME}/lib/argus/argus-redirector-linux` | eBPF redirector (Linux) |
 
-Linux packages install under `/usr/lib/argus`; Windows per-machine NSIS installs under `%ProgramFiles%\argus`. The CLI on PATH is `/usr/local/bin/argus` (Linux) or `{ARGUS_HOME}\bin\argus.exe` (Windows).
+Linux packages install under `/usr/lib/argus`; Windows per-machine NSIS installs under `%ProgramFiles%\argus`. The installer sets `ARGUS_HOME` (Windows: user + system env; Linux: `/etc/profile.d/argus.sh`). The CLI on PATH is `/usr/local/bin/argus` (Linux) or `{ARGUS_HOME}\bin\argus.exe` (Windows).
 
 Dev default when building locally: `argus/target/debug` with `lib/argus/` staged beside `argus-cli.exe`.
 
