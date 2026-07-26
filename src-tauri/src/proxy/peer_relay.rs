@@ -126,7 +126,25 @@ fn is_dev_build_path(path: &Path) -> bool {
 }
 
 fn is_path_under(base: &Path, candidate: &Path) -> bool {
-    candidate.starts_with(base)
+    #[cfg(windows)]
+    {
+        is_windows_path_under(
+            &base.to_string_lossy(),
+            &candidate.to_string_lossy(),
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        candidate.starts_with(base)
+    }
+}
+
+#[cfg(any(windows, test))]
+fn is_windows_path_under(base: &str, candidate: &str) -> bool {
+    let base = base.replace('/', "\\").to_lowercase();
+    let candidate = candidate.replace('/', "\\").to_lowercase();
+    let base = base.trim_end_matches('\\');
+    candidate == base || candidate.starts_with(&format!("{base}\\"))
 }
 
 fn argus_home() -> PathBuf {
@@ -269,6 +287,18 @@ mod tests {
             let (ok, detail) = evaluate_relay_exe_trust(&cli.to_string_lossy());
             assert!(ok, "{detail}");
         });
+    }
+
+    #[test]
+    fn accepts_install_path_case_insensitive() {
+        assert!(is_windows_path_under(
+            r"C:\Program Files\Argus",
+            r"c:\program files\argus\bin\argus.exe",
+        ));
+        assert!(!is_windows_path_under(
+            r"C:\Program Files\Argus",
+            r"C:\Program Files\Argus-Evil\argus.exe",
+        ));
     }
 
     #[test]

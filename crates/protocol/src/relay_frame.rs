@@ -6,19 +6,21 @@ use subtle::ConstantTimeEq;
 
 type HmacSha256 = Hmac<Sha256>;
 
-pub const HEADER_LEN: usize = 20;
+/// Magic (4) + pid (4) + nonce (8) + tag (16) = 32 bytes.
+pub const HEADER_LEN: usize = 32;
+const TAG_LEN: usize = 16;
 
 /// Magic + version: `ARG\x01`.
 pub const MAGIC: [u8; 4] = *b"ARG\x01";
 
-/// Signed relay header: `MAGIC | pid: u32 BE | nonce: u64 BE | tag: u32` (first 4 bytes of HMAC-SHA256).
+/// Signed relay header: `MAGIC | pid: u32 BE | nonce: u64 BE | tag: 16 bytes` (first 16 of HMAC-SHA256).
 pub fn encode_signed(secret: &[u8; 32], captured_pid: u32, nonce: u64) -> [u8; HEADER_LEN] {
     let mut buf = [0u8; HEADER_LEN];
     buf[..4].copy_from_slice(&MAGIC);
     buf[4..8].copy_from_slice(&captured_pid.to_be_bytes());
     buf[8..16].copy_from_slice(&nonce.to_be_bytes());
     let tag = hmac_tag(secret, captured_pid, nonce);
-    buf[16..20].copy_from_slice(&tag);
+    buf[16..32].copy_from_slice(&tag);
     buf
 }
 
@@ -29,7 +31,7 @@ pub fn decode_and_verify(secret: &[u8; 32], prefix: &[u8]) -> Option<(u32, u64)>
     }
     let pid = u32::from_be_bytes(prefix[4..8].try_into().ok()?);
     let nonce = u64::from_be_bytes(prefix[8..16].try_into().ok()?);
-    let tag = &prefix[16..20];
+    let tag = &prefix[16..32];
     let expected = hmac_tag(secret, pid, nonce);
     if bool::from(tag.ct_eq(&expected)) {
         Some((pid, nonce))
@@ -38,14 +40,14 @@ pub fn decode_and_verify(secret: &[u8; 32], prefix: &[u8]) -> Option<(u32, u64)>
     }
 }
 
-fn hmac_tag(secret: &[u8; 32], pid: u32, nonce: u64) -> [u8; 4] {
+fn hmac_tag(secret: &[u8; 32], pid: u32, nonce: u64) -> [u8; TAG_LEN] {
     let mut mac =
         HmacSha256::new_from_slice(secret).expect("HMAC accepts 32-byte keys");
     mac.update(&MAGIC);
     mac.update(&pid.to_be_bytes());
     mac.update(&nonce.to_be_bytes());
     let result = mac.finalize().into_bytes();
-    result[..4].try_into().expect("slice length")
+    result[..TAG_LEN].try_into().expect("slice length")
 }
 
 /// First byte of relay output — used to peek before reading the rest of the header.
@@ -63,6 +65,7 @@ mod tests {
         let pid = 35_096u32;
         let nonce = 42u64;
         let hdr = encode_signed(&secret, pid, nonce);
+        assert_eq!(hdr.len(), HEADER_LEN);
         assert_eq!(decode_and_verify(&secret, &hdr), Some((pid, nonce)));
     }
 
@@ -70,7 +73,7 @@ mod tests {
     fn rejects_bad_tag() {
         let secret = [7u8; 32];
         let mut hdr = encode_signed(&secret, 100, 1);
-        hdr[19] ^= 0xff;
+        hdr[31] ^= 0xff;
         assert_eq!(decode_and_verify(&secret, &hdr), None);
     }
 

@@ -34,7 +34,8 @@ export function BucketProxySettings({
   return (
     <AccordionSection
       title="Argus Proxy"
-      description="Loopback MITM proxy for this bucket. Enable per env key below, then set allowed domains on each mapping."
+      description="Loopback MITM proxy for this bucket. Enable per env key below, then set allowed domains on each mapping. SDK load_env injects HTTP_PROXY; argus run captures HTTPS at the OS level and does not set HTTP_PROXY."
+      defaultOpen
       headerAction={
         <Switch
           checked={bucket.proxyEnabled}
@@ -48,7 +49,8 @@ export function BucketProxySettings({
         <div className="flex flex-wrap items-center gap-2">
           <SecretBadge tone="accent">127.0.0.1:{bucket.proxyPort}</SecretBadge>
           <span className="text-xs text-text-muted">
-            Injected as HTTP_PROXY / HTTPS_PROXY when developers run load_env
+            Library mode: injected as HTTP_PROXY / HTTPS_PROXY by load_env. Sandbox mode
+            (argus run): OS capture — HTTP_PROXY is not set.
           </span>
         </div>
       ) : (

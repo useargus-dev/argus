@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { bridge, BridgeError } from "@/core/bridge";
 import { toast } from "@/core/toast";
 import { useAuthStore } from "@/state/auth-store";
+import { useTauriEvent } from "@/shared/hooks/event";
 import type { BucketMeta } from "@/shared/types/bucket";
 
 export function BucketsPage() {
@@ -38,6 +39,13 @@ export function BucketsPage() {
     }
     void loadBuckets();
   }, [appUnlocked, loadBuckets]);
+
+  useTauriEvent("grants-changed", () => {
+    if (appUnlocked) void loadBuckets();
+  });
+  useTauriEvent("client-access-resolved", () => {
+    if (appUnlocked) void loadBuckets();
+  });
 
   function cacheToken(id: string, token: string) {
     setTokenCache((prev) => ({ ...prev, [id]: token }));

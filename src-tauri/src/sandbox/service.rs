@@ -46,6 +46,7 @@ pub fn create_sandbox_session(
     ttl_minutes: i64,
     proxy_port: u16,
     client_token: &str,
+    inject_real_secrets: bool,
 ) -> AppResult<(
     sandbox_sessions::SandboxSession,
     std::collections::HashMap<String, String>,
@@ -65,7 +66,11 @@ pub fn create_sandbox_session(
             ttl_minutes,
         )?;
 
-        let env = ipc_env::resolve_bucket_env(conn, bucket_id, value_key)?;
+        let env = if inject_real_secrets {
+            ipc_env::resolve_bucket_env_real(conn, bucket_id, value_key)?
+        } else {
+            ipc_env::resolve_bucket_env(conn, bucket_id, value_key)?
+        };
         let ca_bundle_path = ipc_env::resolve_proxy_config(conn, bucket_id, client_token)?
             .map(|c| c.ca_bundle_path)
             .unwrap_or_else(|| {

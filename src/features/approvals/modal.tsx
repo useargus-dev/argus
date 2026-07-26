@@ -1,6 +1,8 @@
+import { useEffect } from "react";
+import { X } from "lucide-react";
+
 import type { GrantRow } from "@/shared/types/client";
 import { Button } from "@/shared/ui/button";
-import { X } from "lucide-react";
 
 type Props = {
   grant: GrantRow;
@@ -9,21 +11,31 @@ type Props = {
 };
 
 export function GrantModal({ grant, displayArgs, onClose }: Props) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         className="absolute inset-0"
-        role="button"
-        tabIndex={-1}
-        aria-label="Close dialog"
+        role="presentation"
         onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       />
-      <div className="relative w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="grant-modal-title"
+        className="relative w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl"
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-text">Grant Details</h3>
+          <h3 id="grant-modal-title" className="text-sm font-semibold text-text">
+            Grant Details
+          </h3>
           <button
             type="button"
             onClick={onClose}

@@ -11,6 +11,7 @@ interface BucketMappingListPanelProps {
   onSelect: (id: string) => void;
   onAdd: () => void;
   loading: boolean;
+  proxyBucketEnabled: boolean;
 }
 
 export function BucketMappingListPanel({
@@ -19,6 +20,7 @@ export function BucketMappingListPanel({
   onSelect,
   onAdd,
   loading,
+  proxyBucketEnabled,
 }: BucketMappingListPanelProps) {
   return (
     <div className="rounded-xl border border-border bg-surface">
@@ -51,7 +53,7 @@ export function BucketMappingListPanel({
                     {m.mappingType === "secret" ? m.secretName ?? "Secret" : "Text value"}
                   </p>
                 </div>
-                {m.proxyEnabled && (
+                {proxyBucketEnabled && m.proxyEnabled && (
                   <SecretBadge tone="accent" className="shrink-0">
                     Proxy
                   </SecretBadge>

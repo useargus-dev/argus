@@ -213,9 +213,18 @@ async fn process_sandbox_create(
     let request_id = req.request_id.clone();
     let fingerprint = peer.fingerprint.clone();
     let _token_hash = buckets::hash_token(&req.client_token);
+    let no_proxy = req.no_proxy;
 
     let proxy_check = with_session_db(state, |conn, _| {
         let meta = buckets::verify_client_token(conn, &req.bucket_id, &req.client_token)?;
+        if no_proxy {
+            return Ok((
+                meta.name.clone(),
+                meta.access_ttl_minutes,
+                meta.proxy_port.unwrap_or(0),
+                false,
+            ));
+        }
         if !meta.proxy_enabled {
             return Err(AppError::message(
                 "PROXY_DISABLED",
@@ -225,10 +234,10 @@ async fn process_sandbox_create(
         let port = meta.proxy_port.ok_or_else(|| {
             AppError::message("PROXY_DISABLED", messages::proxy_port_missing(&meta.name))
         })?;
-        Ok((meta.name.clone(), meta.access_ttl_minutes, port))
+        Ok((meta.name.clone(), meta.access_ttl_minutes, port, true))
     })?;
 
-    let (bucket_name, access_ttl, proxy_port) = proxy_check;
+    let (bucket_name, access_ttl, proxy_port, start_proxy) = proxy_check;
 
     let grant_id = request_client_grant(
         app,
@@ -265,24 +274,31 @@ async fn process_sandbox_create(
             ttl,
             proxy_port,
             &req.client_token,
+            no_proxy,
         )
     })?;
 
     let relay_secret_b64 = base64::engine::general_purpose::STANDARD.encode(relay_secret);
 
-    let _ = ProxyRuntime::ensure_bucket_running(app, &req.bucket_id, proxy_port);
+    if start_proxy && proxy_port > 0 {
+        let _ = ProxyRuntime::ensure_bucket_running(app, &req.bucket_id, proxy_port);
+    }
     touch_activity(state);
 
     Ok(IpcResponse::Ok {
         request_id,
         session_id: Some(session.id),
-        proxy_port: Some(proxy_port),
+        proxy_port: if start_proxy { Some(proxy_port) } else { None },
         expires_at: Some(session.expires_at),
         env,
         ca_bundle_path: Some(ca_bundle_path),
         proxy: None,
         sessions: None,
-        relay_secret: Some(relay_secret_b64),
+        relay_secret: if no_proxy {
+            None
+        } else {
+            Some(relay_secret_b64)
+        },
     })
 }
 

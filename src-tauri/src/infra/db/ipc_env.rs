@@ -45,11 +45,30 @@ pub fn resolve_bucket_env(
     bucket_id: &str,
     value_key: &[u8; 32],
 ) -> AppResult<HashMap<String, String>> {
+    resolve_bucket_env_inner(conn, bucket_id, value_key, false)
+}
+
+/// Same as [`resolve_bucket_env`] but always injects real secret values
+/// (used by `argus run --no-proxy` where there is no MITM rewrite).
+pub fn resolve_bucket_env_real(
+    conn: &Connection,
+    bucket_id: &str,
+    value_key: &[u8; 32],
+) -> AppResult<HashMap<String, String>> {
+    resolve_bucket_env_inner(conn, bucket_id, value_key, true)
+}
+
+fn resolve_bucket_env_inner(
+    conn: &Connection,
+    bucket_id: &str,
+    value_key: &[u8; 32],
+    force_real_secrets: bool,
+) -> AppResult<HashMap<String, String>> {
     let bucket = buckets::get_bucket_meta(conn, bucket_id)?;
     let mappings = bucket_mappings::list_mappings(conn, bucket_id, value_key)?;
     let mut env = HashMap::new();
     for m in mappings {
-        let use_proxy = bucket.proxy_enabled && m.proxy_enabled;
+        let use_proxy = !force_real_secrets && bucket.proxy_enabled && m.proxy_enabled;
         if use_proxy {
             if let Some(ph) = m.proxy_placeholder {
                 env.insert(m.env_label, ph);

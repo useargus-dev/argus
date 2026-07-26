@@ -17,7 +17,6 @@ use crate::infra::db::audit;
 use crate::infra::db::bucket_mappings;
 use crate::sandbox::gate::{self, PidVerifyFailure};
 use crate::proxy::ca;
-use crate::proxy::peer_tcp::peer_pid_from_stream;
 use crate::proxy::server::{
     handle_mitm_request, with_db, BucketProxyContext, MitmAuditMeta,
 };
@@ -149,7 +148,6 @@ pub fn evaluate_transparent_gate(
         }
     };
     if !bucket_mappings::bucket_allows_proxy_host(conn, bucket_id, &host).unwrap_or(false) {
-        let _ = audit::proxy_host_denied(conn, bucket_id, &host, pid);
         return TransparentGateResult::Deny {
             pid: Some(pid),
             reason: "host_denied",
@@ -175,15 +173,23 @@ pub async fn handle_transparent(
         return Ok(());
     }
 
-    let pid = relay_pid.or_else(|| peer_pid_from_stream(&stream).ok());
+    let pid = match relay_pid {
+        Some(pid) => pid,
+        None => {
+            capture_log::log(
+                "gate",
+                "DENY reason=relay_required (transparent TLS without verified relay header)",
+            );
+            let _ = with_db(&ctx, |conn, _| {
+                audit::sandbox_transparent_denied(conn, &ctx.bucket_id, 0, "relay_required")?;
+                Ok(())
+            });
+            return Ok(());
+        }
+    };
     capture_log::log(
         "gate",
-        format!(
-            "relay_pid={relay_pid:?} peer_pid={} bucket={}",
-            pid.map(|p| p.to_string())
-                .unwrap_or_else(|| "none".into()),
-            ctx.bucket_id
-        ),
+        format!("relay_pid={pid} bucket={}", ctx.bucket_id),
     );
     let started = Instant::now();
 
@@ -192,7 +198,7 @@ pub async fn handle_transparent(
             conn,
             vk,
             &ctx.bucket_id,
-            pid,
+            Some(pid),
             &prefix,
         ))
     }) {

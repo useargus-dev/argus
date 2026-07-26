@@ -21,6 +21,7 @@ export function DashboardPage() {
   const [secrets, setSecrets] = useState<SecretMeta[]>([]);
   const [buckets, setBuckets] = useState<BucketMeta[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -32,8 +33,9 @@ export function DashboardPage() {
       setSecrets(s);
       setBuckets(b);
       setPendingCount(p);
+      setLoadError(null);
     } catch {
-      /* not signed in or locked */
+      setLoadError("Could not load dashboard (locked or signed out).");
     }
   }, []);
 
@@ -43,6 +45,7 @@ export function DashboardPage() {
 
   useTauriEvent("client-access-requested", () => refresh());
   useTauriEvent("client-access-resolved", () => refresh());
+  useTauriEvent("grants-changed", () => refresh());
 
   const activeSecrets = secrets.filter((s) => !s.isArchived);
   const orgs = new Set(activeSecrets.map((s) => s.organization).filter(Boolean));
@@ -62,6 +65,9 @@ export function DashboardPage() {
         <p className="mt-1 text-sm text-text-muted">
           Privacy-only · all secrets stay on this device
         </p>
+        {loadError && (
+          <p className="mt-2 text-sm text-danger">{loadError}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -136,14 +142,18 @@ export function DashboardPage() {
               <ul className="divide-y divide-border">
                 {expiring.slice(0, 4).map((s) => {
                   const days = fmtDays(s.expiresAt!);
-                  const tone = days <= 7 ? "danger" : "warning";
+                  const urgent = days <= 7;
                   return (
                     <li
                       key={s.id}
                       className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
                     >
                       <TriangleAlert
-                        className={`size-4 text-${tone}`}
+                        className={
+                          urgent
+                            ? "size-4 text-danger"
+                            : "size-4 text-warning"
+                        }
                         aria-hidden
                       />
                       <div className="min-w-0 flex-1">
@@ -155,7 +165,11 @@ export function DashboardPage() {
                         </div>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-md border border-${tone}/30 bg-${tone}/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-${tone}`}
+                        className={
+                          urgent
+                            ? "inline-flex items-center gap-1 rounded-md border border-danger/30 bg-danger/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-danger"
+                            : "inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning"
+                        }
                       >
                         {days}d
                       </span>

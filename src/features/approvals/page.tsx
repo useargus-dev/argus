@@ -12,6 +12,7 @@ export function ApprovalsPage() {
   const [grants, setGrants] = useState<GrantRow[]>([]);
   const [pending, setPending] = useState<ClientAccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -21,8 +22,11 @@ export function ApprovalsPage() {
       ]);
       setGrants(grantList.filter((g) => g.isActive));
       setPending(pendingList);
+      setLoadError(null);
     } catch {
-      /* locked or not signed in */
+      setLoadError("Could not load approvals (app may be locked).");
+      setGrants([]);
+      setPending([]);
     } finally {
       setLoading(false);
     }
@@ -37,6 +41,10 @@ export function ApprovalsPage() {
   });
 
   useTauriEvent("client-access-resolved", () => {
+    refresh();
+  });
+
+  useTauriEvent("grants-changed", () => {
     refresh();
   });
 
@@ -82,7 +90,13 @@ export function ApprovalsPage() {
         </p>
       </div>
 
-      {pending.length === 0 && grants.length === 0 && (
+      {loadError && (
+        <div className="rounded-lg border border-danger/30 bg-danger/5 p-4">
+          <p className="text-sm text-danger">{loadError}</p>
+        </div>
+      )}
+
+      {!loadError && pending.length === 0 && grants.length === 0 && (
         <div className="rounded-lg border border-border bg-surface p-8 text-center">
           <p className="text-sm text-text-muted">No approvals yet</p>
           <p className="mt-1 text-xs text-text-muted">
