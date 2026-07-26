@@ -15,7 +15,7 @@ use clap::Args;
 
 use crate::config::resolve_bucket;
 use crate::paths::{argus_home, redirector_path};
-use crate::spawn::build_run_command;
+use crate::spawn::{build_run_command, release_paused_child, spawn_paused};
 use protocol::capture_log;
 
 #[derive(Args, Debug)]
@@ -71,21 +71,32 @@ pub async fn run(args: RunArgs) -> Result<()> {
         &bucket.client_token,
         cwd.as_deref(),
         command_preview.as_deref(),
+        args.no_proxy,
         DEFAULT_TIMEOUT,
     )
     .map_err(map_ipc_error)?;
 
-    println!(
-        "✓ Argus connected (bucket: {}, proxy: 127.0.0.1:{})",
-        bucket.bucket_id, session.proxy_port
-    );
+    if args.no_proxy {
+        println!(
+            "✓ Argus connected (bucket: {}, mode: secrets-only --no-proxy)",
+            bucket.bucket_id
+        );
+    } else {
+        println!(
+            "✓ Argus connected (bucket: {}, proxy: 127.0.0.1:{})",
+            bucket.bucket_id, session.proxy_port
+        );
+    }
     println!(
         "✓ Sandbox session: {} (expires {})",
         session.session_id, session.expires_at
     );
 
     if args.no_proxy {
-        let code = run_child(&session.env, &session.ca_bundle_path, &session.session_id, &args.command).await?;
+        let code =
+            run_child(&session.env, &session.ca_bundle_path, &session.session_id, &args.command)
+                .await?;
+        let _ = sandbox_revoke(&session.session_id, DEFAULT_TIMEOUT);
         std::process::exit(code);
     }
 
@@ -184,13 +195,10 @@ pub async fn run(args: RunArgs) -> Result<()> {
         );
     }
 
-    let mut cmd = build_run_command(&args.command, &child_env)?;
-    // Spawn, then register intercept + sandbox PID before the child runs network I/O.
-    let mut child = cmd
-        .spawn()
-        .with_context(|| format!("failed to spawn `{}`", args.command.first().unwrap_or(&"?".into())))?;
-    let root_pid = child.id().unwrap_or(0);
-        capture_log::log("run", format!("spawned child pid={root_pid}"));
+    // Spawn paused, register intercept, then release — closes the early-network race.
+    let mut paused = spawn_paused(&args.command, &child_env)?;
+    let root_pid = paused.child.id().unwrap_or(0);
+    capture_log::log("run", format!("spawned paused child pid={root_pid}"));
     capture_log::log(
         "run",
         format!(
@@ -220,6 +228,9 @@ pub async fn run(args: RunArgs) -> Result<()> {
         );
     }
 
+    release_paused_child(&mut paused).context("failed to release paused child")?;
+    capture_log::log("run", "child released after PID register + intercept");
+
     let session_id = session.session_id.clone();
     let pids_for_watcher = tracked_pids.clone();
     let redirector_for_watcher = redirector.clone();
@@ -241,7 +252,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
         }
     });
 
-    let exit_code = wait_with_signals(&mut child).await?;
+    let exit_code = wait_with_signals(&mut paused.child).await?;
     watcher.stop();
     match Arc::try_unwrap(redirector) {
         Ok(r) => r.stop().await,
@@ -272,7 +283,9 @@ fn print_dry_run(bucket_id: &str, args: &RunArgs) -> Result<()> {
     println!("  Env file:   {}", args.env.display());
     println!("  ARGUS_HOME: {}", argus_home().display());
     println!("  Redirector: {}", redirector_path().display());
-    if let Some(notice) = elevation_notice() {
+    if args.no_proxy {
+        println!("  Mode:       secrets-only (--no-proxy, no OS capture)");
+    } else if let Some(notice) = elevation_notice() {
         println!("  Privilege:  {notice}");
     } else {
         println!("  Privilege:  OK (already elevated)");

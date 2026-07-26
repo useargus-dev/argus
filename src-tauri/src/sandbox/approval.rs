@@ -84,6 +84,7 @@ pub async fn request_client_grant(
         Ok(Err(_)) => PendingDecision::Deny,
         Err(_) => {
             pending_store.respond(req.request_id, PendingDecision::Deny);
+            let _ = app.emit("client-access-resolved", req.request_id);
             return Err(AppError::message(
                 "APPROVAL_TIMEOUT",
                 messages::approval_timeout(),

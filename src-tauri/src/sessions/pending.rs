@@ -89,6 +89,7 @@ impl PendingApprovalStore {
 
     fn prune_expired(&self) {
         let mut guard = self.inner.lock().expect("pending store poisoned");
-        guard.retain(|_, e| e.created.elapsed() < Duration::from_secs(900));
+        // Match sandbox/approval APPROVAL_TIMEOUT_SECS (120s).
+        guard.retain(|_, e| e.created.elapsed() < Duration::from_secs(120));
     }
 }

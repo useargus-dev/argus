@@ -5,11 +5,11 @@
 ## Prerequisites
 
 1. **Argus desktop** installed, signed in, and IPC server active (`~/.argus/argus.sock` on Linux/macOS, `\\.\pipe\argus` on Windows).
-2. **Bucket proxy enabled** in the Argus app for your target bucket.
+2. **Bucket proxy enabled** in the Argus app for full capture mode (not required for `--no-proxy` secrets-only).
 3. **Platform privileges** (requested automatically at redirector start — no admin shell required):
    - **Linux:** `sudo` for eBPF load (kernel ≥ 6.8, native Linux — not WSL2). You may be prompted once per sudo timeout.
    - **Windows:** UAC prompt for `argus-redirector-windows.exe` (WinDivert). The CLI itself stays unprivileged.
-   - **macOS:** Network Extension (M4 — not yet available).
+   - **macOS:** Network Extension (M4 — not yet available). Use `--no-proxy` for secrets-only.
 
 ## Basic usage
 
@@ -32,7 +32,7 @@ argus run --bucket my-bucket -- uvicorn app:main --reload --port 8080
 | `--bucket` | Bucket UUID or name (default: `ARGUS_BUCKET_ID` from `.env`) |
 | `--env` | Path to `.env` (default: `./.env`) |
 | `--dry-run` | Validate plan without executing |
-| `--no-proxy` | Inject env without OS capture |
+| `--no-proxy` | Inject **real** secrets without OS capture (proxy need not be enabled). Session is still created and revoked on exit. |
 
 ## Environment variables set in sandbox mode
 
@@ -56,7 +56,7 @@ The CLI registers the root PID and watches the process tree. New worker PIDs are
 
 ## Relay authentication (Tier 2)
 
-The CLI receives a per-session `relay_secret` from `sandbox_create` and sets `ARGUS_RELAY_SECRET` for the intercept relay only (never injected into the sandbox child). Each relay TCP connection to the bucket proxy carries an HMAC-signed 20-byte header binding the captured PID. The proxy verifies redirector peer attestation + HMAC before MITM.
+The CLI receives a per-session `relay_secret` from `sandbox_create` and installs it **in-process** for the intercept relay only (never via environment, never injected into the sandbox child). Each relay TCP connection to the bucket proxy carries an HMAC-signed header (magic + pid + nonce + 16-byte tag) binding the captured PID. The proxy verifies redirector peer attestation + HMAC before MITM.
 
 ## Linux PID path
 

@@ -40,13 +40,13 @@ function canPersist(fields: FormFields): boolean {
   return true;
 }
 
-function formSnapshot(fields: FormFields, proxyBucketEnabled: boolean): string {
+function formSnapshot(fields: FormFields): string {
   return JSON.stringify({
     envLabel: fields.envLabel.trim(),
     mappingType: fields.mappingType,
     secretId: fields.secretId,
     textValue: fields.textValue.trim(),
-    proxyEnabled: proxyBucketEnabled && fields.proxyEnabled,
+    proxyEnabled: fields.proxyEnabled,
     allowedHosts: fields.allowedHosts,
   });
 }
@@ -114,8 +114,7 @@ export function BucketMappingDetailPanel({
   const hydrateKey = isDraft ? "draft" : mappingId;
   const envNameLocked = !isDraft && !!mapping;
 
-  const dirty =
-    formSnapshot(currentFields, proxyBucketEnabled) !== persistedSnapshot;
+  const dirty = formSnapshot(currentFields) !== persistedSnapshot;
 
   const applyFields = useCallback((fields: FormFields, proxyToken: string | null) => {
     setEnvLabel(fields.envLabel);
@@ -132,13 +131,14 @@ export function BucketMappingDetailPanel({
     if (mapping) {
       const fields = fieldsFromMapping(mapping);
       applyFields(fields, mapping.proxyPlaceholder);
-      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
+      setPersistedSnapshot(formSnapshot(fields));
     } else if (isDraft) {
       const fields = emptyFields();
       applyFields(fields, null);
-      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
+      setPersistedSnapshot(formSnapshot(fields));
     }
-  }, [hydrateKey, isDraft, mapping, proxyBucketEnabled, applyFields]);
+    // Intentionally omit proxyBucketEnabled — toggling bucket proxy must not wipe edits.
+  }, [hydrateKey, isDraft, mapping, applyFields]);
 
   const persist = useCallback(async () => {
     const fields = currentFields;
@@ -152,10 +152,11 @@ export function BucketMappingDetailPanel({
         mappingType: fields.mappingType,
         secretId: fields.mappingType === "secret" ? fields.secretId : undefined,
         textValue: fields.mappingType === "text" ? fields.textValue.trim() : undefined,
-        proxyEnabled: proxyBucketEnabled && fields.proxyEnabled,
+        // Persist the mapping's own proxy flag; bucket-level switch only gates UI/runtime.
+        proxyEnabled: fields.proxyEnabled,
         allowedHosts: fields.allowedHosts,
       });
-      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
+      setPersistedSnapshot(formSnapshot(fields));
       setSavedProxyToken(saved.proxyPlaceholder);
       onSaved(saved);
       toast.success(isDraft ? `${saved.envLabel} created` : `${saved.envLabel} updated`);
@@ -164,7 +165,7 @@ export function BucketMappingDetailPanel({
     } finally {
       setSaving(false);
     }
-  }, [bucketId, proxyBucketEnabled, currentFields, isDraft, onSaved]);
+  }, [bucketId, currentFields, isDraft, onSaved]);
 
   function handleCancel() {
     if (isDraft) {
@@ -174,16 +175,14 @@ export function BucketMappingDetailPanel({
     if (mapping) {
       const fields = fieldsFromMapping(mapping);
       applyFields(fields, mapping.proxyPlaceholder);
-      setPersistedSnapshot(formSnapshot(fields, proxyBucketEnabled));
+      setPersistedSnapshot(formSnapshot(fields));
     }
   }
 
   function handleProxyToggle(enabled: boolean) {
     setProxyEnabled(enabled);
     setTokenRevealed(false);
-    if (!enabled) {
-      setSavedProxyToken(null);
-    }
+    // Keep savedProxyToken so toggling off→on without save still shows the existing token.
   }
 
   if (!mapping && !isDraft) {

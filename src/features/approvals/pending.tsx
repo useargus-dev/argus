@@ -5,7 +5,13 @@ import { Button } from "@/shared/ui/button";
 
 import { fmtAgo, stripArgs } from "@/shared/utils/time";
 
-const TTL_OPTIONS = [15, 60, 180, 480] as const;
+const TTL_BASE = [15, 60, 180, 480] as const;
+
+function ttlOptions(preferred: number): number[] {
+  const opts = new Set<number>(TTL_BASE);
+  if (preferred > 0) opts.add(preferred);
+  return Array.from(opts).sort((a, b) => a - b);
+}
 
 type Props = {
   request: ClientAccessRequest;
@@ -19,6 +25,7 @@ type Props = {
 export function PendingCard({ request, onRespond }: Props) {
   const [ttl, setTtl] = useState(request.accessTtlMinutes || 60);
   const [busy, setBusy] = useState(false);
+  const options = ttlOptions(request.accessTtlMinutes || 60);
 
   const handle = useCallback(
     async (accept: boolean) => {
@@ -82,7 +89,7 @@ export function PendingCard({ request, onRespond }: Props) {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
             TTL
           </span>
-          {TTL_OPTIONS.map((m) => (
+          {options.map((m) => (
             <button
               key={m}
               type="button"

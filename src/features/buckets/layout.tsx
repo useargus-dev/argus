@@ -42,6 +42,7 @@ export function BucketLayout({
         onSelect={onSelect}
         onAdd={onAdd}
         loading={loading}
+        proxyBucketEnabled={proxyBucketEnabled}
       />
       <div className="min-w-0">
         <BucketMappingDetailPanel

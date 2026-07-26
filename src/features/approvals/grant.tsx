@@ -9,12 +9,26 @@ import { fmtAgo, fmtExpires, stripArgs } from "@/shared/utils/time";
 
 type Props = {
   grant: GrantRow;
-  onRevoke: (id: string) => void;
+  onRevoke: (id: string) => void | Promise<void>;
 };
 
 export function GrantCard({ grant, onRevoke }: Props) {
   const [showDetails, setShowDetails] = useState(false);
+  const [revoking, setRevoking] = useState(false);
   const displayArgs = grant.runArgs ? stripArgs(grant.runArgs) : "";
+
+  async function handleRevoke() {
+    if (revoking) return;
+    if (!window.confirm(`Revoke access for ${grant.clientLabel || grant.bucketName}?`)) {
+      return;
+    }
+    setRevoking(true);
+    try {
+      await onRevoke(grant.id);
+    } finally {
+      setRevoking(false);
+    }
+  }
 
   return (
     <>
@@ -32,7 +46,12 @@ export function GrantCard({ grant, onRevoke }: Props) {
           <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-text-muted">
             <span>Granted {fmtAgo(grant.grantedAt)}</span>
             {grant.isActive && (
-              <span className="text-green-600">Expires in {fmtExpires(grant.expiresAt)}</span>
+              <span className="text-green-600">
+                {(() => {
+                  const e = fmtExpires(grant.expiresAt);
+                  return e === "expired" ? "Expired" : `Expires in ${e}`;
+                })()}
+              </span>
             )}
             {!grant.isActive && <span>Expired</span>}
             {grant.lastSeenAt && <span>Last used {fmtAgo(grant.lastSeenAt)}</span>}
@@ -47,8 +66,8 @@ export function GrantCard({ grant, onRevoke }: Props) {
             <Info size={13} />
             Details
           </button>
-          <Button variant="danger" size="sm" onClick={() => onRevoke(grant.id)}>
-            Revoke
+          <Button variant="danger" size="sm" disabled={revoking} onClick={() => void handleRevoke()}>
+            {revoking ? "Revoking…" : "Revoke"}
           </Button>
         </div>
       </div>

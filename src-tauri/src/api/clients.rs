@@ -115,5 +115,7 @@ pub fn revoke_grant(
     let pool = inner.db.as_ref().ok_or("not signed in")?;
     let conn = pool.lock().map_err(|_| "db poisoned".to_string())?;
     revoke_sessions_for_grant(&conn, &grant_id).map_err(|e| e.to_string())?;
-    client_grants::revoke_grant(&conn, &grant_id).map_err(|e| e.to_string())
+    client_grants::revoke_grant(&conn, &grant_id).map_err(|e| e.to_string())?;
+    let _ = app.emit("grants-changed", &grant_id);
+    Ok(())
 }

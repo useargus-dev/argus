@@ -32,6 +32,10 @@ pub struct SandboxCreateRequest {
     pub cwd: Option<String>,
     #[serde(default)]
     pub command_preview: Option<String>,
+    /// When true, inject real secrets and skip requiring an enabled bucket proxy
+    /// (`argus run --no-proxy`). Capture/MITM is not used.
+    #[serde(default)]
+    pub no_proxy: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -224,6 +228,7 @@ mod tests {
             client_token: "tok".into(),
             cwd: None,
             command_preview: Some("cmd /c echo".into()),
+            no_proxy: false,
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains(r#""type":"sandbox_create""#));

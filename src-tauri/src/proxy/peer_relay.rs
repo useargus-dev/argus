@@ -126,7 +126,18 @@ fn is_dev_build_path(path: &Path) -> bool {
 }
 
 fn is_path_under(base: &Path, candidate: &Path) -> bool {
-    candidate.starts_with(base)
+    #[cfg(windows)]
+    {
+        let base_s = base.to_string_lossy().replace('/', "\\").to_lowercase();
+        let cand_s = candidate.to_string_lossy().replace('/', "\\").to_lowercase();
+        let base_trim = base_s.trim_end_matches('\\');
+        cand_s == base_trim
+            || cand_s.starts_with(&format!("{base_trim}\\"))
+    }
+    #[cfg(not(windows))]
+    {
+        candidate.starts_with(base)
+    }
 }
 
 fn argus_home() -> PathBuf {
@@ -265,6 +276,16 @@ mod tests {
     fn accepts_program_files_argus_casing() {
         let home = PathBuf::from(r"C:\Program Files\argus");
         let cli = home.join("bin").join("argus.exe");
+        with_argus_home(&home, || {
+            let (ok, detail) = evaluate_relay_exe_trust(&cli.to_string_lossy());
+            assert!(ok, "{detail}");
+        });
+    }
+
+    #[test]
+    fn accepts_install_path_case_insensitive() {
+        let home = PathBuf::from(r"C:\Program Files\Argus");
+        let cli = PathBuf::from(r"c:\program files\argus\bin\argus.exe");
         with_argus_home(&home, || {
             let (ok, detail) = evaluate_relay_exe_trust(&cli.to_string_lossy());
             assert!(ok, "{detail}");

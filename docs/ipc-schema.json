@@ -18,7 +18,8 @@
         "bucket_id",
         "client_token",
         "cwd?",
-        "command_preview?"
+        "command_preview?",
+        "no_proxy?"
       ]
     },
     "sandbox_register_pids": {

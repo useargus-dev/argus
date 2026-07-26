@@ -46,6 +46,7 @@ pub struct SandboxCreateResult {
     pub env: HashMap<String, String>,
     pub ca_bundle_path: String,
     pub relay_secret: String,
+    pub no_proxy: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -241,6 +242,7 @@ pub fn sandbox_create(
     client_token: &str,
     cwd: Option<&str>,
     command_preview: Option<&str>,
+    no_proxy: bool,
     timeout: Duration,
 ) -> Result<SandboxCreateResult, IpcClientError> {
     let req = SandboxCreateRequest {
@@ -250,6 +252,7 @@ pub fn sandbox_create(
         client_token: client_token.to_string(),
         cwd: cwd.map(str::to_string),
         command_preview: command_preview.map(str::to_string),
+        no_proxy,
     };
     let line = serde_json::to_string(&req)
         .map_err(|e| IpcClientError::InvalidResponse(e.to_string()))?;
@@ -264,20 +267,37 @@ pub fn sandbox_create(
             ca_bundle_path,
             relay_secret,
             ..
-        } => Ok(SandboxCreateResult {
-            session_id: session_id.ok_or_else(|| {
+        } => {
+            let session_id = session_id.ok_or_else(|| {
                 IpcClientError::InvalidResponse(sandbox_response_hint(&raw))
-            })?,
-            proxy_port: proxy_port.ok_or_else(|| {
-                IpcClientError::InvalidResponse(
-                    "missing proxy_port — enable Argus Proxy on this bucket in the app".into(),
-                )
-            })?,
-            expires_at: expires_at.unwrap_or_default(),
-            env,
-            ca_bundle_path: ca_bundle_path.unwrap_or_default(),
-            relay_secret: relay_secret.unwrap_or_default(),
-        }),
+            })?;
+            if no_proxy {
+                Ok(SandboxCreateResult {
+                    session_id,
+                    proxy_port: proxy_port.unwrap_or(0),
+                    expires_at: expires_at.unwrap_or_default(),
+                    env,
+                    ca_bundle_path: ca_bundle_path.unwrap_or_default(),
+                    relay_secret: relay_secret.unwrap_or_default(),
+                    no_proxy: true,
+                })
+            } else {
+                Ok(SandboxCreateResult {
+                    session_id,
+                    proxy_port: proxy_port.ok_or_else(|| {
+                        IpcClientError::InvalidResponse(
+                            "missing proxy_port — enable Argus Proxy on this bucket in the app"
+                                .into(),
+                        )
+                    })?,
+                    expires_at: expires_at.unwrap_or_default(),
+                    env,
+                    ca_bundle_path: ca_bundle_path.unwrap_or_default(),
+                    relay_secret: relay_secret.unwrap_or_default(),
+                    no_proxy: false,
+                })
+            }
+        }
         _ => Err(IpcClientError::InvalidResponse("unexpected response".into())),
     }
 }
