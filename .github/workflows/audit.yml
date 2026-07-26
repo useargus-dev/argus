@@ -37,7 +37,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: pnpm audit
-        run: pnpm audit --audit-level=high
+        # --ignore-registry-errors: npm advisories endpoint sometimes returns
+        # garbled/compressed bodies (ERR_PNPM_AUDIT_BAD_RESPONSE); that is not a
+        # dependency vulnerability and should not fail the PR.
+        run: pnpm audit --audit-level=high --ignore-registry-errors
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
